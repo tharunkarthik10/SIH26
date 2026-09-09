@@ -147,6 +147,66 @@ export interface ActivityLogItem {
   title: string;
   description: string;
   timestamp: string;
-  type: 'measurement' | 'strip' | 'device' | 'worker';
+  type: 'measurement' | 'strip' | 'device' | 'worker' | 'incident' | 'system';
   severity?: 'info' | 'warning' | 'danger' | 'success';
 }
+
+export interface IncidentRecord {
+  id: string;
+  workerId: string;
+  workerName: string;
+  deviceId: string;
+  timestamp: string;
+  exposurePpmH: number;
+  alertType: string;
+  actionTaken: string;
+  supervisorNotified: boolean;
+  acknowledgedByWorker: boolean;
+  acknowledgedAt?: string;
+  notes?: string;
+  status: 'OPEN' | 'ACKNOWLEDGED' | 'RESOLVED';
+}
+
+export interface StripRequisition {
+  id: string;
+  stripId: string;
+  deviceId: string;
+  requestedBy: string;
+  requestedAt: string;
+  quantity: number;
+  urgency: 'ROUTINE' | 'HIGH' | 'CRITICAL_EXPIRED';
+  status: 'PENDING' | 'APPROVED' | 'DISPATCHED' | 'DELIVERED';
+  notes?: string;
+}
+
+export interface ServiceTicket {
+  id: string;
+  deviceId: string;
+  reportedBy: string;
+  reportedAt: string;
+  issueType: 'Sensor Drift' | 'NFC Read Error' | 'Physical Damage' | 'Firmware Glitch' | 'Other';
+  description: string;
+  status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED';
+  priority: 'LOW' | 'MEDIUM' | 'HIGH';
+}
+
+export interface WorkerDocument {
+  id: string;
+  title: string;
+  type: 'training_cert' | 'medical_clearance' | 'fit_test';
+  uploadedAt: string;
+  expiryDate?: string;
+  status: 'VALID' | 'EXPIRING_SOON' | 'EXPIRED';
+  fileSize: string;
+}
+
+export interface DeviceAssignmentRecord {
+  recordId: string;
+  deviceId: string;
+  workerId: string;
+  workerName: string;
+  assignedAt: string;
+  unassignedAt?: string;
+  reason: string;
+}
+

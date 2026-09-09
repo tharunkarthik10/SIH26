@@ -9,7 +9,7 @@ import { assessHealthImpact } from '../services/healthImpactService';
 import { exportMeasurementsToCSV } from '../services/reportService';
 import { StatusPill } from '../components/common/StatusPill';
 import { ScientificDisclaimer } from '../components/common/ScientificDisclaimer';
-import { Measurement, ReadingMethod } from '../types';
+import { Measurement, ReadingMethod, Device } from '../types';
 import { formatIndianTime, formatIndianDate, formatIndianDateTime } from '../utils/dateUtils';
 import { CameraScannerModal, ScannedQRResult } from '../components/camera/CameraScannerModal';
 import { DemoQRCodesModal } from '../components/demo/DemoQRCodesModal';
@@ -40,7 +40,11 @@ import {
   Sparkles,
   CalendarDays,
   AlertCircle,
-  Stethoscope
+  AlertTriangle,
+  CheckCircle2,
+  Stethoscope,
+  Cpu,
+  ShieldAlert
 } from 'lucide-react';
 
 const DAY_COLOR_PALETTE: Record<number, { bg: string; fill: string; stroke: string; text: string; badge: string; dotFill: string }> = {
@@ -54,6 +58,7 @@ const DAY_COLOR_PALETTE: Record<number, { bg: string; fill: string; stroke: stri
 export const ReadPage: React.FC = () => {
   const { user } = useAuth();
   const { activeScenarioId } = useDemo();
+  const { isOffline, isDevMode, pendingSyncQueue, clearPendingSync, addToPendingSync } = useDemo();
   const { 
     workers, 
     devices, 
@@ -66,8 +71,15 @@ export const ReadPage: React.FC = () => {
     lookupDevice,
     lookupStrip,
     lookupWorker,
-    registerChemicalStrip
+    registerChemicalStrip,
+    addIncident
   } = useData();
+
+  // Action flow modal state for Mandatory Shift Removal
+  const [isIncidentModalOpen, setIsIncidentModalOpen] = useState(false);
+  const [incidentNotes, setIncidentNotes] = useState('');
+  const [isAcknowledged, setIsAcknowledged] = useState(false);
+  const [supervisorNotified, setSupervisorNotified] = useState(false);
 
   const userEmail = user?.email || 'rajesh.kumar@industrial-safety.org';
   const assignedWorker = (workers && workers.length > 0)
@@ -106,6 +118,7 @@ export const ReadPage: React.FC = () => {
   // Camera Scanner & Demo QR Modals State
   const [isCameraScannerOpen, setIsCameraScannerOpen] = useState<boolean>(false);
   const [isDemoQRCodesModalOpen, setIsDemoQRCodesModalOpen] = useState<boolean>(false);
+  const [scanBannerMsg, setScanBannerMsg] = useState<{ text: string; type: 'device' | 'safe' | 'hazard' } | null>(null);
 
   // Worker Live Vitals & Past Medical History State
   const [userHeartRate, setUserHeartRate] = useState<number>(78);
@@ -113,11 +126,30 @@ export const ReadPage: React.FC = () => {
 
   // Handle Real Camera QR Code Scan Result (Camera scanner or photo upload)
   const handleRealCameraScanSuccess = (scanned: ScannedQRResult) => {
-    const targetDevice = activeDevice || devices[0] || { deviceId: scanned.deviceId || 'DEV-001' };
-    const targetWorker = assignedWorker || workers[0] || { workerId: scanned.workerId || 'WRK-1002', name: scanned.workerName || 'Rajesh Kumar' };
+    const targetDevice: Device = (activeDevice || devices[0]) || {
+      deviceId: scanned.deviceId || 'DEV-0081',
+      status: 'ONLINE',
+      firmwareVersion: 'v2.4.1',
+      createdAt: new Date().toISOString(),
+      powerStatus: 'AC_CONNECTED'
+    };
+    const targetWorker = assignedWorker || workers[0] || { workerId: scanned.workerId || 'WRK-00124', name: scanned.workerName || 'Rajesh Kumar' };
+
+    // SCENARIO 1: DEVICE QR SCANNED
+    if (scanned.targetType === 'device') {
+      const timestamp = scanned.timestamp || new Date().toISOString();
+      const devId = scanned.deviceId || targetDevice.deviceId;
+      updateDeviceLastScan(devId, timestamp);
+      setScanBannerMsg({
+        text: `Optical Reader Unit ${devId} Paired Successfully! Optical sensor calibrated & ready.`,
+        type: 'device'
+      });
+      return;
+    }
+
+    // SCENARIO 2: CHEMICAL STRIP QR SCANNED
     const scannedStripId = scanned.stripId || 'STRIP-2026-000124';
 
-    // Auto-register strip if missing from inventory
     let strip = chemicalStrips.find(s => s.stripId.toLowerCase() === scannedStripId.toLowerCase());
     if (!strip) {
       registerChemicalStrip({
@@ -130,10 +162,10 @@ export const ReadPage: React.FC = () => {
       });
     }
 
-    // Immediately switch active strip to scanned strip so graph and UI update
     setActiveStripId(scannedStripId);
 
     const timestamp = scanned.timestamp || new Date().toISOString();
+    const isHazard = (scanned.exposurePpmH ?? 0) >= 25;
 
     const newMeasurement: Measurement = {
       measurementId: `MEAS-CAM-${Date.now().toString().slice(-4)}`,
@@ -142,10 +174,10 @@ export const ReadPage: React.FC = () => {
       workerId: targetWorker.workerId,
       workerName: targetWorker.name,
       timestamp,
-      opticalReading: typeof scanned.opticalReading === 'number' ? scanned.opticalReading : 0.42,
-      estimatedExposure: typeof scanned.exposurePpmH === 'number' ? scanned.exposurePpmH : 19.6,
+      opticalReading: typeof scanned.opticalReading === 'number' ? scanned.opticalReading : (isHazard ? 0.241 : 0.770),
+      estimatedExposure: typeof scanned.exposurePpmH === 'number' ? scanned.exposurePpmH : (isHazard ? 38.6 : 4.2),
       exposureUnit: 'ppm·h',
-      exposureStatus: scanned.exposurePpmH >= 25 ? 'HIGH' : (scanned.exposurePpmH >= 10 ? 'MODERATE' : 'LOW'),
+      exposureStatus: isHazard ? 'HIGH' : (scanned.exposurePpmH >= 10 ? 'MODERATE' : 'LOW'),
       calibrationProfileId: 'CP-03',
       measurementStatus: 'success',
       disclaimer: 'SIH 2026 Camera Telemetry Verification Record',
@@ -153,17 +185,50 @@ export const ReadPage: React.FC = () => {
       source: 'camera_scan',
       createdAt: timestamp,
       cameraReading: {
-        analyzedColorHex: scanned.exposurePpmH >= 25 ? '#78350f' : '#d97706',
+        analyzedColorHex: isHazard ? '#78350f' : '#fef08a',
         rgbAbsorbance: scanned.opticalReading,
         estimatedExposure: scanned.exposurePpmH,
         confidenceScore: 98.4
       }
     };
 
+    if (isOffline) {
+      addToPendingSync(newMeasurement);
+    }
+
     saveMeasurement(newMeasurement);
     updateWorkerExposure(targetWorker.workerId, newMeasurement.estimatedExposure, newMeasurement.exposureStatus, newMeasurement.timestamp);
     updateDeviceLastScan(targetDevice.deviceId, newMeasurement.timestamp);
     updateStripStatus(scannedStripId, 'USED', newMeasurement.timestamp);
+
+    // Live visual reaction feedback and incident triggering
+    if (isHazard) {
+      setScanBannerMsg({
+        text: `Strip ${scannedStripId} Scanned: ${newMeasurement.estimatedExposure} ppm·h (HIGH) — MANDATORY MEDICAL SHIFT REMOVAL ACTIVE!`,
+        type: 'hazard'
+      });
+      setIsAcknowledged(false);
+      setSupervisorNotified(false);
+      // Auto-dispatch open incident to Supervisor Dashboard
+      addIncident({
+        workerId: targetWorker.workerId,
+        workerName: targetWorker.name,
+        deviceId: targetDevice.deviceId,
+        timestamp,
+        exposurePpmH: newMeasurement.estimatedExposure,
+        alertType: 'CRITICAL TOXIC HAZARD',
+        actionTaken: 'MANDATORY MEDICAL LEAVE: Immediate 24-Hour Shift Removal',
+        supervisorNotified: true,
+        acknowledgedByWorker: false,
+        notes: `Simulated scan of high-exposure toxic coupon ${scannedStripId}. Real-time plant alert dispatched.`,
+        status: 'OPEN'
+      });
+    } else {
+      setScanBannerMsg({
+        text: `Strip ${scannedStripId} Scanned: ${newMeasurement.estimatedExposure} ppm·h (LOW) — Safe nominal baseline recorded.`,
+        type: 'safe'
+      });
+    }
 
     setScanResult({ 
       success: true, 
@@ -189,6 +254,8 @@ export const ReadPage: React.FC = () => {
   const currentExposure = typeof latestMeasurement?.estimatedExposure === 'number' ? latestMeasurement.estimatedExposure : 4.2;
   const healthAssessment = assessHealthImpact(currentExposure, userHeartRate, userMedicalCondition);
 
+  const isAsthmaCondition = userMedicalCondition.toLowerCase().includes('asthma') || userMedicalCondition.toLowerCase().includes('respiratory');
+
   const handleExecuteScan = async (method: 'nfc' | 'camera') => {
     if (!activeDevice || !assignedWorker) return;
     setIsScanning(true);
@@ -199,7 +266,6 @@ export const ReadPage: React.FC = () => {
     const payload = generateSimulatedScanPayload(activeScenarioId);
     payload.deviceId = activeDevice.deviceId;
 
-    // Target active strip and advance simulated timestamp realistically
     if (activeStrip && ['LOW', 'MODERATE', 'HIGH'].includes(activeScenarioId)) {
       payload.stripId = activeStrip.stripId;
 
@@ -260,6 +326,10 @@ export const ReadPage: React.FC = () => {
         source: method === 'nfc' ? 'nfc_scan' : 'camera_scan',
       };
 
+      if (isOffline) {
+        addToPendingSync(finalMeasurement);
+      }
+
       setScanResult({
         ...result,
         measurement: finalMeasurement,
@@ -267,6 +337,26 @@ export const ReadPage: React.FC = () => {
     } else {
       setScanResult(result);
     }
+  };
+
+  const handleLogIncidentSubmit = () => {
+    if (!assignedWorker || !activeDevice) return;
+    addIncident({
+      workerId: assignedWorker.workerId,
+      workerName: assignedWorker.name,
+      deviceId: activeDevice.deviceId,
+      timestamp: new Date().toISOString(),
+      exposurePpmH: currentExposure,
+      alertType: healthAssessment.riskTitle,
+      actionTaken: healthAssessment.mandatoryRestPeriod,
+      supervisorNotified: true,
+      acknowledgedByWorker: true,
+      notes: incidentNotes || 'Logged by field operator during mandatory shift removal warning.',
+      status: 'OPEN'
+    });
+    setIsIncidentModalOpen(false);
+    setIsAcknowledged(true);
+    setSupervisorNotified(true);
   };
 
   // ONE GRAPH PER STRIP: Filter measurements strictly for active strip
@@ -395,10 +485,68 @@ export const ReadPage: React.FC = () => {
           <h1 className="text-lg font-bold text-slate-900 tracking-tight">Read Optical Telemetry</h1>
           <p className="text-xs text-slate-500 font-sans">NFC Tap & Camera Photo Scanner</p>
         </div>
-        <span className="text-xs font-semibold text-sky-700 bg-sky-100 px-2.5 py-1 rounded-full">
-          Unit: {activeDevice.deviceId}
-        </span>
+
+        <div className="flex items-center gap-1.5">
+          {/* OFFLINE PENDING SYNC STATUS BADGE */}
+          {isOffline ? (
+            <span className="text-[10px] font-bold text-rose-700 bg-rose-100 border border-rose-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+              <span>Offline ({pendingSyncQueue.length} pending)</span>
+            </span>
+          ) : (
+            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded-full">
+              Live Network
+            </span>
+          )}
+          <span className="text-xs font-semibold text-sky-700 bg-sky-100 px-2.5 py-1 rounded-full">
+            Unit: {activeDevice.deviceId}
+          </span>
+        </div>
       </div>
+
+      {/* REAL-TIME LIVE QR SCAN FEEDBACK BANNER */}
+      {scanBannerMsg && (
+        <div className={`p-3 rounded-xl border flex items-center justify-between text-xs font-sans shadow-sm animate-in fade-in ${
+          scanBannerMsg.type === 'hazard' 
+            ? 'bg-rose-100 border-2 border-rose-400 text-rose-950' 
+            : scanBannerMsg.type === 'device' 
+            ? 'bg-sky-50 border border-sky-300 text-sky-950' 
+            : 'bg-emerald-50 border border-emerald-300 text-emerald-950'
+        }`}>
+          <div className="flex items-center gap-2">
+            {scanBannerMsg.type === 'hazard' ? (
+              <ShieldAlert className="w-5 h-5 text-rose-600 shrink-0 animate-pulse" />
+            ) : scanBannerMsg.type === 'device' ? (
+              <Cpu className="w-5 h-5 text-sky-600 shrink-0" />
+            ) : (
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+            )}
+            <span className="font-bold leading-tight">{scanBannerMsg.text}</span>
+          </div>
+          <button 
+            onClick={() => setScanBannerMsg(null)} 
+            className="text-slate-400 hover:text-slate-700 font-bold ml-2 text-xs"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* OFFLINE PENDING SYNC QUEUE NOTIFICATION BANNER */}
+      {isOffline && pendingSyncQueue.length > 0 && (
+        <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between text-xs font-sans">
+          <div className="flex items-center gap-2 text-amber-900">
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span><strong>{pendingSyncQueue.length} readings</strong> stored locally offline. Will auto-sync on network reconnect.</span>
+          </div>
+          <button
+            onClick={() => clearPendingSync()}
+            className="px-2 py-1 bg-amber-600 text-white font-bold text-[10px] rounded hover:bg-amber-700"
+          >
+            Force Sync
+          </button>
+        </div>
+      )}
 
       {/* SCANNING ACTION CTAs CARD */}
       <div className="industrial-card p-4 space-y-4 border-2 border-sky-200 bg-white">
@@ -432,7 +580,7 @@ export const ReadPage: React.FC = () => {
           )}
         </div>
 
-        {/* TWO DEDICATED CTAs */}
+        {/* DEDICATED CTAs */}
         <div className="space-y-2 pt-1">
           {/* CTA 1: NFC TAP MEASUREMENT */}
           <button
@@ -451,81 +599,69 @@ export const ReadPage: React.FC = () => {
             className="w-full py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-extrabold flex items-center justify-center gap-2 transition-all shadow-sm"
           >
             <Camera className="w-4 h-4 text-white" />
-            <span>Photograph Camera Scan (Scan Demo QR)</span>
-          </button>
-
-          {/* CTA 3: VIEW 2 DEMO QR CODES */}
-          <button
-            onClick={() => setIsDemoQRCodesModalOpen(true)}
-            className="w-full py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 transition-all border border-slate-200/90"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-sky-600" />
-            <span>Display 2 Demo Scannable QR Codes</span>
+            <span>Photograph Camera Scan (Scan Strip or Device QR)</span>
           </button>
         </div>
       </div>
 
-      {/* LATEST RESULT & HEALTH DAMAGE RISK ASSESSMENT CARD */}
+      {/* LATEST RESULT & REGULATORY REFERENCE ANCHORS CARD */}
       {latestMeasurement && (
         <div className="industrial-card p-4 bg-white space-y-3 border-2 border-sky-100 animate-in fade-in">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
             <div>
-              <div className="text-[11px] text-slate-500 font-medium">Cumulative Dosage Result</div>
+              <div className="text-[11px] text-slate-500 font-bold flex items-center gap-1">
+                <span>Cumulative Dosage Result</span>
+                <span className="text-[10px] text-sky-700 font-normal underline">(Shift-Cumulative 8h Dose)</span>
+              </div>
               <div className="text-2xl font-extrabold text-slate-900 flex items-baseline gap-1">
                 <span>{(currentExposure ?? 0).toFixed(1)}</span>
                 <span className="text-xs font-bold text-slate-500">ppm·h</span>
               </div>
             </div>
 
-            <StatusPill status={healthAssessment.status} />
+            <div className="space-y-1 text-right">
+              <StatusPill status={healthAssessment.status} />
+              <div className="text-[9px] text-slate-400 font-mono">Shift TWA: ~{(currentExposure / 8).toFixed(2)} ppm</div>
+            </div>
           </div>
 
-          {/* WORKER TELEMETRY VITALS & PAST MEDICAL CONTROLS */}
-          <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2 text-xs font-sans">
-            <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider flex items-center justify-between">
-              <span>Worker Risk Factors (Vitals & Medical History)</span>
+          {/* REGULATORY EXPOSURE LIMIT REFERENCE ANCHORS */}
+          <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5 text-[10px] font-sans">
+            <div className="font-bold text-slate-700 uppercase tracking-wider text-[9px] flex items-center justify-between">
+              <span>Regulatory Gas Exposure Limit Reference Anchors</span>
+              <span className="text-sky-700 font-mono">OSHA / NIOSH Standards</span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-1 text-center font-semibold">
+              <div className={`p-1.5 rounded-lg border ${currentExposure >= 10 ? 'bg-amber-100 border-amber-300 text-amber-900' : 'bg-white border-slate-200 text-slate-700'}`}>
+                <div className="font-bold">OSHA PEL</div>
+                <div className="text-[9px]">10 ppm (8h TWA)</div>
+              </div>
+
+              <div className={`p-1.5 rounded-lg border ${currentExposure >= 15 ? 'bg-amber-200 border-amber-400 text-amber-950 font-bold' : 'bg-white border-slate-200 text-slate-700'}`}>
+                <div className="font-bold">OSHA STEL</div>
+                <div className="text-[9px]">15 ppm (15-min)</div>
+              </div>
+
+              <div className={`p-1.5 rounded-lg border ${currentExposure >= 25 ? 'bg-rose-100 border-rose-300 text-rose-900 font-bold' : 'bg-white border-slate-200 text-slate-700'}`}>
+                <div className="font-bold">NIOSH IDLH</div>
+                <div className="text-[9px]">100 ppm Ceiling</div>
+              </div>
+            </div>
+          </div>
+
+          {/* WORKER TELEMETRY VITALS & ASTHMA RISK MULTIPLIER EXPLANATION */}
+          <div className="p-2.5 bg-sky-50/70 rounded-xl border border-sky-200 space-y-2 text-xs font-sans">
+            <div className="text-[10px] text-sky-900 font-bold uppercase tracking-wider flex items-center justify-between">
+              <span>Worker Risk Profile & Asthma Safety Factor</span>
               <span className="text-sky-700 font-mono">ID: {assignedWorker?.workerId || 'WRK-00124'}</span>
             </div>
 
-            {/* Heart Rate Selector */}
+            {/* Past Medical Condition Selector */}
             <div className="flex items-center justify-between gap-1 text-[11px]">
               <span className="text-slate-600 font-medium flex items-center gap-1">
-                <HeartPulse className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                Heart Rate:
-              </span>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setUserHeartRate(78)}
-                  className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-all ${
-                    userHeartRate === 78 ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs' : 'bg-white text-slate-700 border-slate-200'
-                  }`}
-                >
-                  78 BPM
-                </button>
-                <button
-                  onClick={() => setUserHeartRate(108)}
-                  className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-all ${
-                    userHeartRate === 108 ? 'bg-amber-600 text-white border-amber-600 shadow-2xs' : 'bg-white text-slate-700 border-slate-200'
-                  }`}
-                >
-                  108 BPM
-                </button>
-                <button
-                  onClick={() => setUserHeartRate(132)}
-                  className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-all ${
-                    userHeartRate === 132 ? 'bg-rose-600 text-white border-rose-600 shadow-2xs' : 'bg-white text-slate-700 border-slate-200'
-                  }`}
-                >
-                  132 BPM
-                </button>
-              </div>
-            </div>
-
-            {/* Past Medical Condition Selector */}
-            <div className="flex items-center justify-between gap-1 text-[11px] pt-1 border-t border-slate-200/60">
-              <span className="text-slate-600 font-medium flex items-center gap-1">
                 <Stethoscope className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                Medical Condition:
+                Medical Baseline:
               </span>
               <select
                 value={userMedicalCondition}
@@ -538,40 +674,118 @@ export const ReadPage: React.FC = () => {
                 <option value="Healthy Baseline (No Conditions)">Healthy Baseline</option>
               </select>
             </div>
+
+            {/* ASTHMA ADJUSTMENT CALCULATION EXPLANATION BANNER */}
+            <div className="p-2 bg-white rounded-lg border border-sky-200 text-[10px] text-slate-700 space-y-0.5">
+              <div className="font-bold text-sky-900 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3 text-sky-600" />
+                <span>Risk Model Safety Factor: {isAsthmaCondition ? '0.8x Applied' : '1.0x Baseline'}</span>
+              </div>
+              <p className="text-slate-500 leading-tight">
+                {isAsthmaCondition 
+                  ? 'Worker profile has logged Asthma. Personal shift exposure limit is reduced by 20% (16.0 ppm·h vs Standard 20.0 ppm·h) to prevent bronchial hyper-reactivity.' 
+                  : 'Nominal physiological tolerance model applied for healthy baseline operator.'}
+              </p>
+            </div>
           </div>
 
-          {/* ULTRA MINIMAL HEALTH ASSESSMENT BANNER */}
-          <div className={`p-2.5 rounded-xl border flex items-center justify-between gap-2.5 text-xs transition-all ${
-            healthAssessment.alertLevel === 'critical' || healthAssessment.isMedicalLeaveRequired
-              ? 'bg-rose-50 border-rose-200 text-rose-950'
-              : healthAssessment.alertLevel === 'moderate'
-              ? 'bg-amber-50 border-amber-200 text-amber-950'
-              : 'bg-emerald-50 border-emerald-200 text-emerald-950'
-          }`}>
-            <div className="flex items-center gap-2.5 min-w-0 flex-1">
-              <HeartPulse className={`w-4 h-4 shrink-0 ${
-                healthAssessment.isMedicalLeaveRequired ? 'text-rose-600' :
-                healthAssessment.alertLevel === 'moderate' ? 'text-amber-600' : 'text-emerald-600'
-              }`} />
-              <div className="min-w-0">
-                <div className="font-bold text-[11px] truncate flex items-center gap-1.5">
+          {/* EXPLICIT ACTION FLOW FOR MANDATORY MEDICAL SHIFT REMOVAL */}
+          {healthAssessment.isMedicalLeaveRequired || healthAssessment.alertLevel === 'critical' || healthAssessment.alertLevel === 'moderate' ? (
+            <div className="p-3 bg-rose-50 border-2 border-rose-300 rounded-xl space-y-2.5 text-xs font-sans">
+              <div className="flex items-center justify-between text-rose-950 font-extrabold">
+                <span className="flex items-center gap-1.5 text-xs">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 animate-pulse" />
                   <span>{healthAssessment.riskTitle}</span>
-                </div>
-                <div className="text-[10px] opacity-80 truncate leading-snug">
-                  {healthAssessment.recommendedAction}
-                </div>
+                </span>
+                <span className="text-[10px] bg-rose-200 text-rose-900 px-2 py-0.5 rounded font-mono">ACTION REQUIRED</span>
+              </div>
+
+              <p className="text-[11px] text-rose-900 leading-tight">
+                {healthAssessment.recommendedAction}
+              </p>
+
+              {/* THREE EXPLICIT ACTION BUTTONS */}
+              <div className="grid grid-cols-3 gap-1.5 pt-1">
+                {/* 1. ACKNOWLEDGE BUTTON */}
+                <button
+                  onClick={() => setIsAcknowledged(true)}
+                  className={`py-2 px-2 rounded-lg font-bold text-[10px] border flex items-center justify-center gap-1 transition-all ${
+                    isAcknowledged ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-rose-900 border-rose-300 hover:bg-rose-100'
+                  }`}
+                >
+                  <CheckCircle2 className="w-3 h-3" />
+                  <span>{isAcknowledged ? 'Acknowledged' : 'Acknowledge'}</span>
+                </button>
+
+                {/* 2. NOTIFY SUPERVISOR BUTTON */}
+                <button
+                  onClick={() => setSupervisorNotified(true)}
+                  className={`py-2 px-2 rounded-lg font-bold text-[10px] border flex items-center justify-center gap-1 transition-all ${
+                    supervisorNotified ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-rose-900 border-rose-300 hover:bg-rose-100'
+                  }`}
+                >
+                  <Activity className="w-3 h-3 text-sky-600" />
+                  <span>{supervisorNotified ? 'Supervisor Sent' : 'Notify Supervisor'}</span>
+                </button>
+
+                {/* 3. LOG INCIDENT BUTTON */}
+                <button
+                  onClick={() => setIsIncidentModalOpen(true)}
+                  className="py-2 px-2 rounded-lg bg-rose-700 hover:bg-rose-800 text-white font-bold text-[10px] flex items-center justify-center gap-1 transition-all shadow-2xs"
+                >
+                  <AlertCircle className="w-3 h-3" />
+                  <span>Log Incident</span>
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
+
+      {/* INCIDENT LOGGING MODAL */}
+      {isIncidentModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-4 max-w-sm w-full space-y-3 font-sans shadow-2xl animate-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-1.5">
+                <AlertCircle className="w-4 h-4 text-rose-600" />
+                <span>Log Safety Incident Record</span>
+              </h3>
+              <button onClick={() => setIsIncidentModalOpen(false)} className="text-slate-400 hover:text-slate-700 text-xs">✕</button>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <div className="p-2 bg-slate-50 rounded-lg">
+                <div>Worker: <strong>{assignedWorker?.name}</strong></div>
+                <div>Exposure: <strong>{currentExposure.toFixed(1)} ppm·h</strong></div>
+                <div>Action: <strong>{healthAssessment.mandatoryRestPeriod}</strong></div>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700">Incident Details & Symptoms:</label>
+                <textarea
+                  value={incidentNotes}
+                  onChange={(e) => setIncidentNotes(e.target.value)}
+                  placeholder="Describe location, symptoms (eye irritation, headache, nausea), or leak source..."
+                  className="w-full mt-1 p-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-sky-500 h-20"
+                />
               </div>
             </div>
 
-            <span className={`shrink-0 px-2.5 py-1 rounded-lg font-bold text-[10px] font-mono border ${
-              healthAssessment.isMedicalLeaveRequired
-                ? 'bg-rose-100 text-rose-800 border-rose-300'
-                : healthAssessment.alertLevel === 'moderate'
-                ? 'bg-amber-100 text-amber-800 border-amber-300'
-                : 'bg-emerald-100 text-emerald-800 border-emerald-300'
-            }`}>
-              {healthAssessment.mandatoryRestPeriod.replace('MANDATORY MEDICAL LEAVE: ', '')}
-            </span>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => setIsIncidentModalOpen(false)}
+                className="flex-1 py-2 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleLogIncidentSubmit}
+                className="flex-1 py-2 rounded-xl bg-rose-600 text-white font-bold text-xs hover:bg-rose-700 shadow-sm"
+              >
+                Submit Incident Log
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -812,13 +1026,6 @@ export const ReadPage: React.FC = () => {
         isOpen={isCameraScannerOpen}
         onClose={() => setIsCameraScannerOpen(false)}
         onScanSuccess={handleRealCameraScanSuccess}
-      />
-
-      {/* Demo QR Codes Modal */}
-      <DemoQRCodesModal
-        isOpen={isDemoQRCodesModalOpen}
-        onClose={() => setIsDemoQRCodesModalOpen(false)}
-        onSelectPresetScan={handleRealCameraScanSuccess}
       />
     </div>
   );

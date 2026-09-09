@@ -7,7 +7,12 @@ import {
   CalibrationProfile, 
   ActivityLogItem, 
   ExposureStatus,
-  StripStatus
+  StripStatus,
+  IncidentRecord,
+  StripRequisition,
+  ServiceTicket,
+  WorkerDocument,
+  DeviceAssignmentRecord
 } from '../types';
 import { 
   INITIAL_WORKERS, 
@@ -15,7 +20,12 @@ import {
   INITIAL_CHEMICAL_STRIPS, 
   INITIAL_CALIBRATION_PROFILES, 
   INITIAL_MEASUREMENTS, 
-  INITIAL_ACTIVITY_LOGS 
+  INITIAL_ACTIVITY_LOGS,
+  INITIAL_INCIDENTS,
+  INITIAL_STRIP_REQUISITIONS,
+  INITIAL_SERVICE_TICKETS,
+  INITIAL_WORKER_DOCUMENTS,
+  INITIAL_DEVICE_ASSIGNMENTS
 } from '../services/dataService';
 
 interface DataContextType {
@@ -25,10 +35,16 @@ interface DataContextType {
   measurements: Measurement[];
   calibrationProfiles: CalibrationProfile[];
   activityLogs: ActivityLogItem[];
+  incidents: IncidentRecord[];
+  stripRequisitions: StripRequisition[];
+  serviceTickets: ServiceTicket[];
+  workerDocuments: WorkerDocument[];
+  deviceAssignments: DeviceAssignmentRecord[];
   saveMeasurement: (measurement: Measurement) => void;
   registerChemicalStrip: (strip: Omit<ChemicalStrip, 'createdAt' | 'status'> & { status?: StripStatus }) => void;
   registerDevice: (device: Omit<Device, 'createdAt' | 'powerStatus'>) => void;
   registerWorker: (worker: Omit<Worker, 'createdAt'>) => void;
+  updateWorkerProfile: (workerId: string, updates: Partial<Worker>) => void;
   updateStripStatus: (stripId: string, status: StripStatus, usedAt?: string) => void;
   updateDeviceLastScan: (deviceId: string, timestamp: string) => void;
   updateWorkerExposure: (workerId: string, exposure: number, status: ExposureStatus, timestamp: string) => void;
@@ -36,12 +52,17 @@ interface DataContextType {
   lookupStrip: (stripId: string) => ChemicalStrip | undefined;
   lookupWorker: (workerId: string) => Worker | undefined;
   replaceActiveStrip: (deviceId: string, newStripId: string, batchId: string, replacedByEmail: string) => void;
+  addIncident: (incident: Omit<IncidentRecord, 'id'>) => void;
+  acknowledgeIncident: (incidentId: string) => void;
+  requestStripReplacement: (req: Omit<StripRequisition, 'id' | 'requestedAt' | 'status'>) => void;
+  createServiceTicket: (ticket: Omit<ServiceTicket, 'id' | 'reportedAt' | 'status'>) => void;
+  uploadWorkerDocument: (doc: Omit<WorkerDocument, 'id' | 'uploadedAt' | 'status'>) => void;
   resetToDemoData: () => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-const LOCAL_STORAGE_KEY = 'SIH_H2S_DOSIMETER_DATA_V5';
+const LOCAL_STORAGE_KEY = 'SIH_H2S_DOSIMETER_DATA_V7';
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [workers, setWorkers] = useState<Worker[]>(() => {
@@ -121,27 +142,62 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return INITIAL_ACTIVITY_LOGS;
   });
 
+  const [incidents, setIncidents] = useState<IncidentRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_INCIDENTS');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) { console.warn(e); }
+    return INITIAL_INCIDENTS;
+  });
 
-  // Sync to local storage for persistence across refreshes
-  useEffect(() => {
-    localStorage.setItem(LOCAL_STORAGE_KEY + '_WORKERS', JSON.stringify(workers));
-  }, [workers]);
+  const [stripRequisitions, setStripRequisitions] = useState<StripRequisition[]>(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_REQUISITIONS');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) { console.warn(e); }
+    return INITIAL_STRIP_REQUISITIONS;
+  });
 
-  useEffect(() => {
-    localStorage.setItem(LOCAL_STORAGE_KEY + '_DEVICES', JSON.stringify(devices));
-  }, [devices]);
+  const [serviceTickets, setServiceTickets] = useState<ServiceTicket[]>(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_TICKETS');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) { console.warn(e); }
+    return INITIAL_SERVICE_TICKETS;
+  });
 
-  useEffect(() => {
-    localStorage.setItem(LOCAL_STORAGE_KEY + '_STRIPS', JSON.stringify(chemicalStrips));
-  }, [chemicalStrips]);
+  const [workerDocuments, setWorkerDocuments] = useState<WorkerDocument[]>(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_KEY + '_DOCUMENTS');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) { console.warn(e); }
+    return INITIAL_WORKER_DOCUMENTS;
+  });
 
-  useEffect(() => {
-    localStorage.setItem(LOCAL_STORAGE_KEY + '_MEASUREMENTS', JSON.stringify(measurements));
-  }, [measurements]);
+  const [deviceAssignments] = useState<DeviceAssignmentRecord[]>(INITIAL_DEVICE_ASSIGNMENTS);
 
-  useEffect(() => {
-    localStorage.setItem(LOCAL_STORAGE_KEY + '_LOGS', JSON.stringify(activityLogs));
-  }, [activityLogs]);
+  // Sync state to local storage
+  useEffect(() => { localStorage.setItem(LOCAL_STORAGE_KEY + '_WORKERS', JSON.stringify(workers)); }, [workers]);
+  useEffect(() => { localStorage.setItem(LOCAL_STORAGE_KEY + '_DEVICES', JSON.stringify(devices)); }, [devices]);
+  useEffect(() => { localStorage.setItem(LOCAL_STORAGE_KEY + '_STRIPS', JSON.stringify(chemicalStrips)); }, [chemicalStrips]);
+  useEffect(() => { localStorage.setItem(LOCAL_STORAGE_KEY + '_MEASUREMENTS', JSON.stringify(measurements)); }, [measurements]);
+  useEffect(() => { localStorage.setItem(LOCAL_STORAGE_KEY + '_LOGS', JSON.stringify(activityLogs)); }, [activityLogs]);
+  useEffect(() => { localStorage.setItem(LOCAL_STORAGE_KEY + '_INCIDENTS', JSON.stringify(incidents)); }, [incidents]);
+  useEffect(() => { localStorage.setItem(LOCAL_STORAGE_KEY + '_REQUISITIONS', JSON.stringify(stripRequisitions)); }, [stripRequisitions]);
+  useEffect(() => { localStorage.setItem(LOCAL_STORAGE_KEY + '_TICKETS', JSON.stringify(serviceTickets)); }, [serviceTickets]);
+  useEffect(() => { localStorage.setItem(LOCAL_STORAGE_KEY + '_DOCUMENTS', JSON.stringify(workerDocuments)); }, [workerDocuments]);
 
   const lookupDevice = (deviceId: string) => devices.find(d => d.deviceId.toLowerCase() === (deviceId || '').toLowerCase());
   const lookupStrip = (stripId: string) => chemicalStrips.find(s => s.stripId.toLowerCase() === (stripId || '').toLowerCase());
@@ -187,15 +243,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createdAt: new Date().toISOString(),
     };
     setDevices(prev => [newDevice, ...prev]);
-
-    setActivityLogs(prev => [{
-      id: `ACT-${Date.now().toString().slice(-4)}`,
-      title: 'Device Registered',
-      description: `New NFC Reader ${newDevice.deviceId} provisioned.`,
-      timestamp: new Date().toISOString(),
-      type: 'device',
-      severity: 'info',
-    }, ...prev]);
   };
 
   const registerWorker = (workerData: Omit<Worker, 'createdAt'>) => {
@@ -204,15 +251,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createdAt: new Date().toISOString(),
     };
     setWorkers(prev => [newWorker, ...prev]);
+  };
 
-    setActivityLogs(prev => [{
-      id: `ACT-${Date.now().toString().slice(-4)}`,
-      title: 'Worker Registered',
-      description: `Worker ${newWorker.name} (${newWorker.workerId}) added to ${newWorker.department}.`,
-      timestamp: new Date().toISOString(),
-      type: 'worker',
-      severity: 'info',
-    }, ...prev]);
+  const updateWorkerProfile = (workerId: string, updates: Partial<Worker>) => {
+    setWorkers(prev => prev.map(w => w.workerId === workerId ? { ...w, ...updates } : w));
   };
 
   const updateStripStatus = (stripId: string, status: StripStatus, usedAt?: string) => {
@@ -252,7 +294,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const replaceActiveStrip = (deviceId: string, newStripId: string, batchId: string, replacedByEmail: string) => {
     const now = new Date().toISOString();
 
-    // 1. Update current chemical strips
     setChemicalStrips(prev => [
       {
         stripId: newStripId,
@@ -266,26 +307,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ...prev.map(s => s.status === 'VALID' ? { ...s, status: 'USED' as const, usedAt: now } : s)
     ]);
 
-    // 2. Update device strip history: mark old active record as USED, prepend new VALID record
     setDevices(prev => prev.map(d => {
       if (d.deviceId.toLowerCase() === (deviceId || '').toLowerCase()) {
         const oldHistory = d.stripHistory || [];
         const updatedHistory = oldHistory.map(h => {
           if (h.status === 'VALID') {
-            const insTime = new Date(h.insertedAt).getTime();
-            const nowTime = new Date(now).getTime();
-            const diffHours = Math.max(1, Math.round((nowTime - insTime) / (3600 * 1000)));
-            const days = Math.floor(diffHours / 24);
-            const hours = diffHours % 24;
-            const durationText = days > 0 ? `${days}d ${hours}h` : `${hours} hours`;
-
             return {
               ...h,
               status: 'USED' as const,
               removedAt: now,
               totalObservedExposure: h.totalObservedExposure || 48.2,
               opticalAbsorbance: h.opticalAbsorbance || 0.220,
-              usageDurationText: durationText,
+              usageDurationText: 'Completed active shift',
             };
           }
           return h;
@@ -310,15 +343,92 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return d;
     }));
 
-    // 3. Log activity
     setActivityLogs(prev => [{
       id: `ACT-${Date.now().toString().slice(-4)}`,
       title: 'Strip Replaced & Archived',
-      description: `New Chemical Strip ${newStripId} inserted into ${deviceId}. Previous strip archived into replacement history.`,
+      description: `New Chemical Strip ${newStripId} inserted into ${deviceId}.`,
       timestamp: now,
       type: 'strip',
       severity: 'success',
     }, ...prev]);
+  };
+
+  const addIncident = (incidentData: Omit<IncidentRecord, 'id'>) => {
+    const newInc: IncidentRecord = {
+      ...incidentData,
+      id: `INC-2026-${(incidents.length + 1).toString().padStart(3, '0')}`,
+    };
+    setIncidents(prev => [newInc, ...prev]);
+
+    setActivityLogs(prev => [{
+      id: `ACT-${Date.now().toString().slice(-4)}`,
+      title: 'Incident Recorded',
+      description: `Incident ${newInc.id} logged for ${newInc.workerName}: ${newInc.alertType}`,
+      timestamp: newInc.timestamp,
+      type: 'incident',
+      severity: 'danger',
+    }, ...prev]);
+  };
+
+  const acknowledgeIncident = (incidentId: string) => {
+    const now = new Date().toISOString();
+    setIncidents(prev => prev.map(inc => inc.id === incidentId ? {
+      ...inc,
+      status: 'ACKNOWLEDGED',
+      acknowledgedByWorker: true,
+      acknowledgedAt: now
+    } : inc));
+  };
+
+  const requestStripReplacement = (req: Omit<StripRequisition, 'id' | 'requestedAt' | 'status'>) => {
+    const now = new Date().toISOString();
+    const newReq: StripRequisition = {
+      ...req,
+      id: `REQ-${Math.floor(100 + Math.random() * 900)}`,
+      requestedAt: now,
+      status: 'PENDING'
+    };
+    setStripRequisitions(prev => [newReq, ...prev]);
+
+    setActivityLogs(prev => [{
+      id: `ACT-${Date.now().toString().slice(-4)}`,
+      title: 'Strip Requisition Placed',
+      description: `Requisition ${newReq.id} submitted for Strip ${newReq.stripId} (Qty: ${newReq.quantity})`,
+      timestamp: now,
+      type: 'strip',
+      severity: 'warning'
+    }, ...prev]);
+  };
+
+  const createServiceTicket = (tck: Omit<ServiceTicket, 'id' | 'reportedAt' | 'status'>) => {
+    const now = new Date().toISOString();
+    const newTicket: ServiceTicket = {
+      ...tck,
+      id: `TCK-${Math.floor(100 + Math.random() * 900)}`,
+      reportedAt: now,
+      status: 'OPEN'
+    };
+    setServiceTickets(prev => [newTicket, ...prev]);
+
+    setActivityLogs(prev => [{
+      id: `ACT-${Date.now().toString().slice(-4)}`,
+      title: 'Service Ticket Logged',
+      description: `Ticket ${newTicket.id} created for ${newTicket.deviceId}: ${newTicket.issueType}`,
+      timestamp: now,
+      type: 'device',
+      severity: 'warning'
+    }, ...prev]);
+  };
+
+  const uploadWorkerDocument = (doc: Omit<WorkerDocument, 'id' | 'uploadedAt' | 'status'>) => {
+    const now = new Date().toISOString();
+    const newDoc: WorkerDocument = {
+      ...doc,
+      id: `DOC-${Math.floor(100 + Math.random() * 900)}`,
+      uploadedAt: now,
+      status: 'VALID'
+    };
+    setWorkerDocuments(prev => [newDoc, ...prev]);
   };
 
   const resetToDemoData = () => {
@@ -327,6 +437,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setChemicalStrips(INITIAL_CHEMICAL_STRIPS);
     setMeasurements(INITIAL_MEASUREMENTS);
     setActivityLogs(INITIAL_ACTIVITY_LOGS);
+    setIncidents(INITIAL_INCIDENTS);
+    setStripRequisitions(INITIAL_STRIP_REQUISITIONS);
+    setServiceTickets(INITIAL_SERVICE_TICKETS);
+    setWorkerDocuments(INITIAL_WORKER_DOCUMENTS);
     localStorage.clear();
   };
 
@@ -338,10 +452,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       measurements,
       calibrationProfiles,
       activityLogs,
+      incidents,
+      stripRequisitions,
+      serviceTickets,
+      workerDocuments,
+      deviceAssignments,
       saveMeasurement,
       registerChemicalStrip,
       registerDevice,
       registerWorker,
+      updateWorkerProfile,
       updateStripStatus,
       updateDeviceLastScan,
       updateWorkerExposure,
@@ -349,6 +469,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       lookupStrip,
       lookupWorker,
       replaceActiveStrip,
+      addIncident,
+      acknowledgeIncident,
+      requestStripReplacement,
+      createServiceTicket,
+      uploadWorkerDocument,
       resetToDemoData
     }}>
       {children}
@@ -363,3 +488,4 @@ export const useData = () => {
   }
   return context;
 };
+

@@ -12,7 +12,7 @@ interface MobileLayoutProps {
 }
 
 export const MobileLayout: React.FC<MobileLayoutProps> = ({ children, activeTab, setActiveTab }) => {
-  const { isOffline, setIsOffline } = useDemo();
+  const { isOffline, setIsOffline, isDevMode } = useDemo();
   const [currentTime, setCurrentTime] = useState<string>('');
   const [isDemoQrOpen, setIsDemoQrOpen] = useState<boolean>(false);
 
@@ -49,15 +49,18 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({ children, activeTab,
           </div>
 
           <div className="flex items-center gap-1.5 text-xs">
-            {/* Demo QR Button */}
-            <button
-              onClick={() => setIsDemoQrOpen(true)}
-              className="p-1 rounded-lg bg-sky-50 text-sky-700 border border-sky-200 transition-all flex items-center gap-1 text-[10px] font-bold px-1.5"
-              title="View 2 Demo QR Codes"
-            >
-              <QrCode className="w-3 h-3 text-sky-600" />
-              <span>QRs</span>
-            </button>
+            {/* Demo QR Button (Gated by Dev Mode) */}
+            {isDevMode && (
+              <button
+                onClick={() => setIsDemoQrOpen(true)}
+                className="p-1 rounded-lg bg-amber-50 text-amber-800 border border-amber-300 transition-all flex items-center gap-1 text-[10px] font-bold px-1.5"
+                title="[DEV MODE] View 2 Demo QR Codes"
+              >
+                <QrCode className="w-3 h-3 text-amber-600" />
+                <span>QRs</span>
+              </button>
+            )}
+
 
             {/* Live Clock */}
             <div className="flex items-center gap-1 text-[10px] font-mono text-slate-600 bg-slate-100 px-1.5 py-1 rounded-lg">

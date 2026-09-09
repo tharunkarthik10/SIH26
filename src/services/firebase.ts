@@ -4,13 +4,13 @@ import { getFirestore, Firestore } from 'firebase/firestore';
 
 // Active SIH 2026 Firebase project configuration
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyBnbBx-rs8RvIG1hm97jylN3NYHaWic6_4",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "sih2026-d40b8.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "sih2026-d40b8",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "sih2026-d40b8.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "122201308840",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:122201308840:web:675b53142e55e0b94ecc9d",
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-5XM59P1FSN"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyCnuhU1e5TgMnD2JGXTS0WIUKpKjdkMvVk",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "h2sgas-7d3ae.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "h2sgas-7d3ae",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "h2sgas-7d3ae.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "973364448440",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:973364448440:web:5b54616fde653fab72f84d",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-7LRH7RC8VQ"
 };
 
 let app: FirebaseApp | null = null;

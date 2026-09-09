@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SIH 2026 - Scannable Demo QR Codes</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
+      padding: 32px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .header {
+      text-align: center;
+      max-width: 650px;
+      margin-bottom: 32px;
+    }
+    h1 { font-size: 24px; font-weight: 800; color: #0284c7; margin-bottom: 8px; }
+    p { font-size: 13px; color: #64748b; line-height: 1.5; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+      max-width: 1000px;
+      width: 100%;
+    }
+    .card {
+      background: #ffffff;
+      border: 2px solid #e2e8f0;
+      border-radius: 20px;
+      padding: 24px;
+      text-align: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      transition: all 0.2s ease;
+    }
+    .card:hover {
+      border-color: #0284c7;
+      transform: translateY(-2px);
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .badge-device { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+    .badge-safe { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+    .badge-hazard { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+    .title { font-size: 16px; font-weight: 800; margin-bottom: 4px; }
+    .subtitle { font-size: 12px; color: #64748b; margin-bottom: 16px; }
+    .qr-img {
+      width: 220px;
+      height: 220px;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      padding: 8px;
+      background: #fff;
+      margin: 0 auto 16px auto;
+      display: block;
+    }
+    .details {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 11px;
+      text-align: left;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      color: #334155;
+    }
+    .details div {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+    .details div:last-child { margin-bottom: 0; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Scannable Industrial QR Codes</h1>
+    <p>Point your mobile camera at these codes using the <strong>"Photograph Camera Scan"</strong> feature on the Read screen to verify live data updates in real time.</p>
+  </div>
+
+  <div class="grid">
+    <!-- QR 1: DEVICE -->
+    <div class="card">
+      <span class="badge badge-device">Hardware Reader Unit</span>
+      <h2 class="title">Optical Reader Unit</h2>
+      <p class="subtitle">Unit ID: DEV-0081 (v2.4.1)</p>
+      <img class="qr-img" src="/qr-codes/qr_1_device_dev0081.png" alt="Reader Unit DEV-0081 QR Code" />
+      <div class="details">
+        <div><span>Unit:</span><strong>DEV-0081</strong></div>
+        <div><span>Firmware:</span><strong>v2.4.1</strong></div>
+        <div><span>Power:</span><strong>Battery 94%</strong></div>
+        <div><span>Worker:</span><strong>Rajesh Kumar</strong></div>
+        <div><span>Action:</span><span style="color:#0284c7; font-weight:bold;">Pairs Reader Device</span></div>
+      </div>
+    </div>
+
+    <!-- QR 2: SAFE STRIP -->
+    <div class="card">
+      <span class="badge badge-safe">Chemical Strip: Low / Safe</span>
+      <h2 class="title">Strip #1 (Safe Baseline)</h2>
+      <p class="subtitle">ID: STRIP-2026-000124 (Nominal)</p>
+      <img class="qr-img" src="/qr-codes/qr_2_strip_safe_124.png" alt="Strip #1 Safe QR Code" />
+      <div class="details">
+        <div><span>Strip ID:</span><strong>...000124</strong></div>
+        <div><span>Absorbance:</span><strong>0.770 AU</strong></div>
+        <div><span>Exposure:</span><strong style="color:#15803d;">4.2 ppm·h (LOW)</strong></div>
+        <div><span>Action:</span><span style="color:#15803d; font-weight:bold;">Safe Shift Telemetry</span></div>
+      </div>
+    </div>
+
+    <!-- QR 3: HAZARD STRIP -->
+    <div class="card">
+      <span class="badge badge-hazard">Chemical Strip: High Hazard</span>
+      <h2 class="title">Strip #2 (Gas Leak Spike)</h2>
+      <p class="subtitle">ID: STRIP-2026-000126 (Emergency)</p>
+      <img class="qr-img" src="/qr-codes/qr_3_strip_hazard_126.png" alt="Strip #2 Hazard QR Code" />
+      <div class="details">
+        <div><span>Strip ID:</span><strong>...000126</strong></div>
+        <div><span>Absorbance:</span><strong>0.241 AU</strong></div>
+        <div><span>Exposure:</span><strong style="color:#b91c1c;">38.6 ppm·h (HIGH)</strong></div>
+        <div><span>Action:</span><span style="color:#b91c1c; font-weight:bold;">Shift Removal Alert</span></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

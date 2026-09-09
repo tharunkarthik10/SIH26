@@ -10,6 +10,8 @@ import { DevicePage } from './pages/DevicePage';
 import { StripPage } from './pages/StripPage';
 import { ReadPage } from './pages/ReadPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { SupervisorDashboardPage } from './pages/SupervisorDashboardPage';
+import { IncidentLogPage } from './pages/IncidentLogPage';
 
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
@@ -32,13 +34,16 @@ const AppContent: React.FC = () => {
 
   return (
     <MobileLayout activeTab={activeTab} setActiveTab={setActiveTab}>
-      {activeTab === 'device' && <DevicePage />}
-      {activeTab === 'strip' && <StripPage />}
       {activeTab === 'read' && <ReadPage />}
+      {activeTab === 'strip' && <StripPage />}
+      {activeTab === 'device' && <DevicePage />}
+      {activeTab === 'supervisor' && <SupervisorDashboardPage />}
+      {activeTab === 'incidents' && <IncidentLogPage />}
       {activeTab === 'profile' && <ProfilePage />}
     </MobileLayout>
   );
 };
+
 
 export function App() {
   return (

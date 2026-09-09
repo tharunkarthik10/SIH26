@@ -521,3 +521,148 @@ export const INITIAL_ACTIVITY_LOGS: ActivityLogItem[] = [
     severity: 'danger',
   },
 ];
+
+export const INITIAL_INCIDENTS = [
+  {
+    id: 'INC-2026-003',
+    workerId: 'WRK-00126',
+    workerName: 'Vikram Singh',
+    deviceId: 'DEV-0083',
+    timestamp: new Date(Date.now() - 3600000 * 1).toISOString(),
+    exposurePpmH: 38.6,
+    alertType: 'CRITICAL TOXIC HAZARD',
+    actionTaken: 'MANDATORY MEDICAL LEAVE: Immediate 24-Hour Shift Removal',
+    supervisorNotified: true,
+    acknowledgedByWorker: true,
+    notes: 'Worker triggered ceiling limit (38.6 ppm·h). Urgent evacuation to plant medical bay.',
+    status: 'OPEN' as const,
+  },
+  {
+    id: 'INC-2026-001',
+    workerId: 'WRK-00126',
+    workerName: 'Vikram Singh',
+    deviceId: 'DEV-0083',
+    timestamp: new Date(Date.now() - 3600000 * 12).toISOString(),
+    exposurePpmH: 38.6,
+    alertType: 'CRITICAL TOXIC HAZARD',
+    actionTaken: 'MANDATORY MEDICAL LEAVE: 24-Hour Shift Removal',
+    supervisorNotified: true,
+    acknowledgedByWorker: true,
+    acknowledgedAt: new Date(Date.now() - 3600000 * 11).toISOString(),
+    notes: 'Worker evacuated safely to clean air zone. Oxygen administered.',
+    status: 'ACKNOWLEDGED' as const,
+  },
+  {
+    id: 'INC-2026-002',
+    workerId: 'WRK-00125',
+    workerName: 'Ananya Sharma',
+    deviceId: 'DEV-0082',
+    timestamp: new Date(Date.now() - 3600000 * 5).toISOString(),
+    exposurePpmH: 14.8,
+    alertType: 'ELEVATED RESPIRATORY IRRITATION',
+    actionTaken: 'Mandatory 45-Minute Rest Break',
+    supervisorNotified: true,
+    acknowledgedByWorker: true,
+    acknowledgedAt: new Date(Date.now() - 3600000 * 4.8).toISOString(),
+    notes: 'Precautionary hydration break in fresh air facility.',
+    status: 'RESOLVED' as const,
+  }
+];
+
+export const INITIAL_STRIP_REQUISITIONS = [
+  {
+    id: 'REQ-801',
+    stripId: 'STRIP-2026-000124',
+    deviceId: 'DEV-0081',
+    requestedBy: 'rajesh.kumar@industrial-safety.org',
+    requestedAt: new Date(Date.now() - 3600000 * 36).toISOString(),
+    quantity: 5,
+    urgency: 'ROUTINE' as const,
+    status: 'DISPATCHED' as const,
+    notes: 'Routine monthly replacement buffer for Refinery Ops Unit 4.',
+  },
+  {
+    id: 'REQ-802',
+    stripId: 'STRIP-2026-000126',
+    deviceId: 'DEV-0083',
+    requestedBy: 'vikram.singh@industrial-safety.org',
+    requestedAt: new Date(Date.now() - 3600000 * 2).toISOString(),
+    quantity: 10,
+    urgency: 'CRITICAL_EXPIRED' as const,
+    status: 'PENDING' as const,
+    notes: 'Urgent strip replacement after toxic gas surge.',
+  }
+];
+
+export const INITIAL_SERVICE_TICKETS = [
+  {
+    id: 'TCK-401',
+    deviceId: 'DEV-0083',
+    reportedBy: 'vikram.singh@industrial-safety.org',
+    reportedAt: new Date(Date.now() - 3600000 * 24).toISOString(),
+    issueType: 'Sensor Drift' as const,
+    description: 'Minor optical lens dusting noticed after high exposure event.',
+    status: 'IN_PROGRESS' as const,
+    priority: 'MEDIUM' as const,
+  }
+];
+
+export const INITIAL_WORKER_DOCUMENTS = [
+  {
+    id: 'DOC-101',
+    title: 'H2S Gas Safety & NFC Reader Certification 2026',
+    type: 'training_cert' as const,
+    uploadedAt: '2026-01-10T08:00:00Z',
+    expiryDate: '2027-01-10T08:00:00Z',
+    status: 'VALID' as const,
+    fileSize: '1.4 MB (PDF)',
+  },
+  {
+    id: 'DOC-102',
+    title: 'Annual Respiratory Medical Clearance (Asthma Track)',
+    type: 'medical_clearance' as const,
+    uploadedAt: '2026-02-15T09:30:00Z',
+    expiryDate: '2027-02-15T09:30:00Z',
+    status: 'VALID' as const,
+    fileSize: '890 KB (PDF)',
+  },
+  {
+    id: 'DOC-103',
+    title: 'Full-Face Respirator Fit Test Record',
+    type: 'fit_test' as const,
+    uploadedAt: '2025-11-20T10:00:00Z',
+    expiryDate: '2026-11-20T10:00:00Z',
+    status: 'VALID' as const,
+    fileSize: '450 KB (PDF)',
+  }
+];
+
+export const INITIAL_DEVICE_ASSIGNMENTS = [
+  {
+    recordId: 'ASG-003',
+    deviceId: 'DEV-0081',
+    workerId: 'WRK-00124',
+    workerName: 'Rajesh Kumar',
+    assignedAt: '2026-01-15T08:00:00Z',
+    reason: 'Primary shift deployment for Desulfurization Unit 4',
+  },
+  {
+    recordId: 'ASG-002',
+    deviceId: 'DEV-0081',
+    workerId: 'WRK-00121',
+    workerName: 'Sunita Sharma',
+    assignedAt: '2025-08-01T08:00:00Z',
+    unassignedAt: '2026-01-15T07:50:00Z',
+    reason: 'Transferred to Offsite Pipeline Inspection',
+  },
+  {
+    recordId: 'ASG-001',
+    deviceId: 'DEV-0081',
+    workerId: 'WRK-00110',
+    workerName: 'Amit Verma',
+    assignedAt: '2025-01-10T08:00:00Z',
+    unassignedAt: '2025-07-31T17:00:00Z',
+    reason: 'Completed 6-month rotation schedule',
+  }
+];
+

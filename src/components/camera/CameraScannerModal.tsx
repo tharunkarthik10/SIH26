@@ -13,6 +13,7 @@ export interface ScannedQRResult {
   workerName?: string;
   source: 'camera_scan';
   rawData?: string;
+  targetType?: 'device' | 'strip';
 }
 
 interface CameraScannerModalProps {
@@ -86,16 +87,18 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
       let result: ScannedQRResult;
 
       if (parsed && typeof parsed === 'object') {
+        const isDevice = parsed.type === 'sih_h2s_device' || parsed.targetType === 'device';
         result = {
-          deviceId: parsed.deviceId || parsed.id || 'DEV-001',
-          stripId: parsed.stripId || 'STRIP-2026-000124',
-          exposurePpmH: typeof parsed.exposurePpmH === 'number' ? parsed.exposurePpmH : (typeof parsed.estimatedExposure === 'number' ? parsed.estimatedExposure : 19.6),
-          opticalReading: typeof parsed.opticalReading === 'number' ? parsed.opticalReading : 0.42,
+          deviceId: parsed.deviceId || parsed.id || 'DEV-0081',
+          stripId: parsed.stripId || (isDevice ? 'N/A' : 'STRIP-2026-000124'),
+          exposurePpmH: typeof parsed.exposurePpmH === 'number' ? parsed.exposurePpmH : (typeof parsed.estimatedExposure === 'number' ? parsed.estimatedExposure : 4.2),
+          opticalReading: typeof parsed.opticalReading === 'number' ? parsed.opticalReading : (isDevice ? 0.99 : 0.77),
           timestamp: parsed.timestamp || new Date().toISOString(),
-          workerId: parsed.workerId || 'WRK-1002',
-          workerName: parsed.workerName || 'Rajesh Kumar',
+          workerId: parsed.workerId || parsed.assignedWorkerId || 'WRK-00124',
+          workerName: parsed.workerName || parsed.assignedWorkerName || 'Rajesh Kumar',
           source: 'camera_scan',
           rawData: codeText,
+          targetType: isDevice ? 'device' : 'strip'
         };
       } else {
         // Plain string QR code fallback
@@ -103,15 +106,16 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
         const isStripStr = codeText.toLowerCase().includes('strip');
 
         result = {
-          deviceId: isDeviceStr ? codeText : 'DEV-001',
+          deviceId: isDeviceStr ? codeText : 'DEV-0081',
           stripId: isStripStr ? codeText : 'STRIP-2026-000124',
-          exposurePpmH: 19.6,
-          opticalReading: 0.42,
+          exposurePpmH: 4.2,
+          opticalReading: 0.77,
           timestamp: new Date().toISOString(),
-          workerId: 'WRK-1002',
+          workerId: 'WRK-00124',
           workerName: 'Rajesh Kumar',
           source: 'camera_scan',
           rawData: codeText,
+          targetType: isDeviceStr ? 'device' : 'strip'
         };
       }
 

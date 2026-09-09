@@ -128,10 +128,10 @@ export const ReadPage: React.FC = () => {
   const handleRealCameraScanSuccess = (scanned: ScannedQRResult) => {
     const targetDevice: Device = (activeDevice || devices[0]) || {
       deviceId: scanned.deviceId || 'DEV-0081',
-      status: 'ONLINE',
+      status: 'CONNECTED',
       firmwareVersion: 'v2.4.1',
       createdAt: new Date().toISOString(),
-      powerStatus: 'AC_CONNECTED'
+      powerStatus: 'NFC powered'
     };
     const targetWorker = assignedWorker || workers[0] || { workerId: scanned.workerId || 'WRK-00124', name: scanned.workerName || 'Rajesh Kumar' };
 

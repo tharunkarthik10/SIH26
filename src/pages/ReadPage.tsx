@@ -507,6 +507,43 @@ export const ReadPage: React.FC = () => {
         </div>
       </div>
 
+      {/* SCAN CONTROLS: Clean 2-Action Grid */}
+      <div className="bg-white rounded-2xl p-3 border border-slate-200/90 shadow-xs space-y-2.5">
+        <div className="grid grid-cols-2 gap-2">
+          {/* Primary Action: NFC Tap */}
+          <button
+            onClick={() => handleExecuteScan('nfc')}
+            disabled={isScanning}
+            className="py-3 px-3 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-[0.98] text-white font-bold text-xs flex flex-col items-center justify-center gap-1.5 transition-all shadow-xs disabled:opacity-60"
+          >
+            <Radio className={`w-5 h-5 ${isScanning && activeScanMethod === 'nfc' ? 'animate-spin' : ''}`} />
+            <span>{isScanning && activeScanMethod === 'nfc' ? 'Reading NFC...' : 'NFC Tap'}</span>
+          </button>
+
+          {/* Secondary Action: Camera QR Scan */}
+          <button
+            onClick={() => setIsCameraScannerOpen(true)}
+            disabled={isScanning}
+            className="py-3 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-[0.98] border border-slate-200 text-slate-800 font-bold text-xs flex flex-col items-center justify-center gap-1.5 transition-all disabled:opacity-60"
+          >
+            <Camera className="w-5 h-5 text-slate-600" />
+            <span>Camera Scan</span>
+          </button>
+        </div>
+
+        {/* Scan in progress step status */}
+        {isScanning && (
+          <div className="p-2 bg-sky-50 rounded-xl text-center space-y-0.5 animate-in fade-in">
+            <div className="text-xs font-bold text-sky-800">
+              {currentStepState?.label || "Communicating with sensor..."}
+            </div>
+            <div className="text-[10px] text-slate-500">
+              {currentStepState?.detail || "Hold dosimeter close to NFC antenna"}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* HEALTH IMPACT & ESTIMATED REST TIME ANALYZER */}
       <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-xs space-y-3">
         <div className="flex items-center justify-between pb-2 border-b border-slate-100">
@@ -643,43 +680,6 @@ export const ReadPage: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* SCAN CONTROLS: Clean 2-Action Grid */}
-      <div className="bg-white rounded-2xl p-3 border border-slate-200/90 shadow-xs space-y-2.5">
-        <div className="grid grid-cols-2 gap-2">
-          {/* Primary Action: NFC Tap */}
-          <button
-            onClick={() => handleExecuteScan('nfc')}
-            disabled={isScanning}
-            className="py-3 px-3 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-[0.98] text-white font-bold text-xs flex flex-col items-center justify-center gap-1.5 transition-all shadow-xs disabled:opacity-60"
-          >
-            <Radio className={`w-5 h-5 ${isScanning && activeScanMethod === 'nfc' ? 'animate-spin' : ''}`} />
-            <span>{isScanning && activeScanMethod === 'nfc' ? 'Reading NFC...' : 'NFC Tap'}</span>
-          </button>
-
-          {/* Secondary Action: Camera QR Scan */}
-          <button
-            onClick={() => setIsCameraScannerOpen(true)}
-            disabled={isScanning}
-            className="py-3 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-[0.98] border border-slate-200 text-slate-800 font-bold text-xs flex flex-col items-center justify-center gap-1.5 transition-all disabled:opacity-60"
-          >
-            <Camera className="w-5 h-5 text-slate-600" />
-            <span>Camera Scan</span>
-          </button>
-        </div>
-
-        {/* Scan in progress step status */}
-        {isScanning && (
-          <div className="p-2 bg-sky-50 rounded-xl text-center space-y-0.5 animate-in fade-in">
-            <div className="text-xs font-bold text-sky-800">
-              {currentStepState?.label || "Communicating with sensor..."}
-            </div>
-            <div className="text-[10px] text-slate-500">
-              {currentStepState?.detail || "Hold dosimeter close to NFC antenna"}
-            </div>
-          </div>
-        )}
-      </div>
 
       {/* Exposure Trend Chart */}
       <div className="bg-white rounded-2xl p-3.5 border border-slate-200/90 shadow-xs space-y-2">

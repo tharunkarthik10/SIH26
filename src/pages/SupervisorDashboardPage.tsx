@@ -1,25 +1,16 @@
 import React, { useState } from 'react';
 import { useData } from '../context/DataContext';
 import { StatusPill } from '../components/common/StatusPill';
-import { formatIndianTime, formatIndianDateTime } from '../utils/dateUtils';
+import { formatIndianTime } from '../utils/dateUtils';
 import { 
   Users, 
   ShieldAlert, 
-  Activity, 
   Search, 
-  CheckCircle2, 
-  AlertTriangle, 
-  Radio, 
-  Tag, 
-  Clock, 
-  FileText,
-  UserCheck,
-  Send,
-  Building
+  CheckCircle2
 } from 'lucide-react';
 
 export const SupervisorDashboardPage: React.FC = () => {
-  const { workers, devices, chemicalStrips, measurements, incidents, acknowledgeIncident } = useData();
+  const { workers, devices, incidents, acknowledgeIncident } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState<string>('ALL');
 
@@ -43,63 +34,62 @@ export const SupervisorDashboardPage: React.FC = () => {
   const openIncidents = (incidents || []).filter(i => i && i.status === 'OPEN');
 
   return (
-    <div className="space-y-4 font-sans animate-in fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
+    <div className="space-y-3.5 font-sans animate-in fade-in pb-2">
+      {/* Top Header */}
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
-            <Users className="w-5 h-5 text-sky-600" />
-            <span>Supervisor Plant Dashboard</span>
+          <h1 className="text-base font-bold text-slate-900 tracking-tight flex items-center gap-1.5">
+            <Users className="w-4 h-4 text-sky-600" />
+            <span>Plant Safety Overview</span>
           </h1>
-          <p className="text-xs text-slate-500">Multi-Worker Real-Time Telemetry & Alert Dispatch</p>
+          <p className="text-[11px] text-slate-500">
+            {workers.length} active workers monitored
+          </p>
         </div>
-        <span className="px-2.5 py-1 rounded-full bg-sky-600 text-white font-bold text-xs shadow-sm">
-          Supervisor View
+        <span className="px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 font-bold text-[10px]">
+          Supervisor
         </span>
       </div>
 
-      {/* PLANT SAFETY OVERVIEW STAT CARDS */}
-      <div className="grid grid-cols-3 gap-2 font-sans">
-        <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 space-y-1">
-          <div className="text-[10px] text-emerald-700 font-bold uppercase tracking-wider">Nominal Workers</div>
-          <div className="text-xl font-extrabold text-emerald-900">{nominalWorkers.length}</div>
-          <div className="text-[10px] text-emerald-600">Safe Exposure Range</div>
+      {/* 3-METRIC STATUS STRIP */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="bg-white p-2.5 rounded-2xl border border-slate-200/90 shadow-xs text-center">
+          <span className="text-[10px] text-slate-400 font-medium block">Safe</span>
+          <span className="text-lg font-extrabold text-emerald-700">{nominalWorkers.length}</span>
         </div>
 
-        <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 space-y-1">
-          <div className="text-[10px] text-amber-700 font-bold uppercase tracking-wider">Rest Breaks Needed</div>
-          <div className="text-xl font-extrabold text-amber-900">{moderateWorkers.length}</div>
-          <div className="text-[10px] text-amber-600">Moderate Accumulation</div>
+        <div className="bg-white p-2.5 rounded-2xl border border-slate-200/90 shadow-xs text-center">
+          <span className="text-[10px] text-slate-400 font-medium block">Rest Needed</span>
+          <span className="text-lg font-extrabold text-amber-600">{moderateWorkers.length}</span>
         </div>
 
-        <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 space-y-1">
-          <div className="text-[10px] text-rose-700 font-bold uppercase tracking-wider">Medical Leave / Evac</div>
-          <div className="text-xl font-extrabold text-rose-900">{highRiskWorkers.length}</div>
-          <div className="text-[10px] text-rose-600">Critical Toxic Hazard</div>
+        <div className="bg-white p-2.5 rounded-2xl border border-slate-200/90 shadow-xs text-center">
+          <span className="text-[10px] text-slate-400 font-medium block">Critical / Evac</span>
+          <span className="text-lg font-extrabold text-rose-600">{highRiskWorkers.length}</span>
         </div>
       </div>
 
-      {/* OPEN INCIDENTS ALERT DISPATCH BANNER */}
+      {/* OPEN INCIDENTS ALERT (Only if unacknowledged incidents exist) */}
       {openIncidents.length > 0 && (
-        <div className="p-3 bg-rose-100 border-2 border-rose-300 rounded-xl space-y-2 text-xs">
-          <div className="font-extrabold text-rose-950 flex items-center justify-between">
+        <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl space-y-2 text-xs">
+          <div className="flex items-center justify-between font-bold text-rose-950">
             <span className="flex items-center gap-1.5">
-              <ShieldAlert className="w-4 h-4 text-rose-600 animate-pulse" />
-              <span>UNACKNOWLEDGED EMERGENCY INCIDENTS ({openIncidents.length})</span>
+              <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>Pending Incident Alerts ({openIncidents.length})</span>
             </span>
-            <span className="text-[10px] px-2 py-0.5 bg-rose-200 text-rose-900 rounded font-mono">ACTION REQUIRED</span>
+            <span className="text-[10px] bg-rose-200 text-rose-900 px-1.5 py-0.5 rounded font-medium">Action</span>
           </div>
 
           <div className="space-y-1.5">
             {openIncidents.map(inc => (
-              <div key={inc.id} className="p-2.5 bg-white rounded-lg border border-rose-200 flex items-center justify-between gap-2">
+              <div key={inc.id} className="p-2 bg-white rounded-xl border border-rose-200 flex items-center justify-between gap-2">
                 <div>
-                  <div className="font-bold text-slate-900 text-[11px]">{inc.workerName} ({inc.workerId})</div>
-                  <div className="text-[10px] text-rose-700">{inc.alertType} — {inc.exposurePpmH} ppm·h</div>
+                  <div className="font-bold text-slate-900 text-[11px]">{inc.workerName}</div>
+                  <div className="text-[10px] text-rose-700">{inc.alertType} • {inc.exposurePpmH} ppm·h</div>
                 </div>
                 <button
                   onClick={() => acknowledgeIncident(inc.id)}
-                  className="px-2.5 py-1 rounded-md bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px] flex items-center gap-1 shadow-2xs"
+                  className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px] flex items-center gap-1"
                 >
                   <CheckCircle2 className="w-3 h-3" />
                   <span>Acknowledge</span>
@@ -110,46 +100,38 @@ export const SupervisorDashboardPage: React.FC = () => {
         </div>
       )}
 
-      {/* WORKER SEARCH & DEPT FILTER */}
-      <div className="industrial-card p-3 space-y-3 bg-white border border-slate-200 text-xs">
-        <div className="flex flex-col sm:flex-row gap-2">
+      {/* SEARCH & DEPARTMENT FILTER */}
+      <div className="bg-white p-3 rounded-2xl border border-slate-200/90 shadow-xs space-y-2.5">
+        <div className="flex gap-2">
           <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
             <input
               type="text"
-              placeholder="Search worker by name, ID, code..."
+              placeholder="Search by name, ID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-sky-500"
+              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-sky-500"
             />
           </div>
 
           <select
             value={selectedDepartment}
             onChange={(e) => setSelectedDepartment(e.target.value)}
-            className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700"
+            className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none"
           >
-            <option value="ALL">All Departments</option>
+            <option value="ALL">All Depts</option>
             <option value="Desulfurization">Desulfurization</option>
-            <option value="Chemical Storage">Chemical Storage</option>
-            <option value="Pipeline">Pipeline Inspection</option>
-            <option value="Lab">Quality Control Lab</option>
+            <option value="Chemical Storage">Storage</option>
+            <option value="Pipeline">Pipeline</option>
+            <option value="Lab">QC Lab</option>
           </select>
         </div>
 
-        {/* WORKER MONITORING GRID / CARDS */}
-        <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+        {/* WORKER CARDS LIST */}
+        <div className="space-y-1.5 max-h-96 overflow-y-auto pr-0.5">
           {filteredWorkers.length === 0 ? (
-            <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200 space-y-2 font-sans">
-              <Users className="w-8 h-8 text-slate-400 mx-auto" />
-              <div className="text-xs font-bold text-slate-700">No personnel found</div>
-              <div className="text-[11px] text-slate-500">No workers match the selected query or department filter.</div>
-              <button
-                onClick={() => { setSearchTerm(''); setSelectedDepartment('ALL'); }}
-                className="px-3 py-1 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-[10px] font-bold"
-              >
-                Reset Filters
-              </button>
+            <div className="text-center py-6 text-xs text-slate-400">
+              No workers matching search filter
             </div>
           ) : (
             filteredWorkers.map(worker => {
@@ -158,19 +140,21 @@ export const SupervisorDashboardPage: React.FC = () => {
               const assignedDev = (devices || []).find(d => d && d.assignedWorkerId === worker.workerId);
 
               return (
-                <div key={worker.workerId} className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2 hover:bg-slate-100/80 transition-all">
+                <div 
+                  key={worker.workerId} 
+                  className="p-2.5 bg-slate-50 hover:bg-slate-100/70 rounded-xl border border-slate-100 space-y-1.5 transition-all text-xs"
+                >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-xl bg-sky-600 text-white font-bold flex items-center justify-center text-xs">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-sky-100 text-sky-700 font-bold flex items-center justify-center text-xs">
                         {worker.name.charAt(0)}
                       </div>
                       <div>
-                        <div className="font-extrabold text-slate-900 text-xs flex items-center gap-1.5">
-                          <span>{worker.name}</span>
-                          <span className="text-[10px] text-slate-400 font-mono">({worker.workerId})</span>
+                        <div className="font-bold text-slate-900 text-xs">
+                          {worker.name}
                         </div>
-                        <div className="text-[10px] text-slate-500 leading-tight truncate max-w-[200px] whitespace-normal break-words">
-                          {worker.department}
+                        <div className="text-[10px] text-slate-400">
+                          {worker.department} • {worker.employeeCode}
                         </div>
                       </div>
                     </div>
@@ -178,22 +162,22 @@ export const SupervisorDashboardPage: React.FC = () => {
                     <StatusPill status={status} />
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 text-[11px] border-t border-b border-slate-200/60 py-1.5 text-slate-600">
+                  <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-200/50 text-slate-500">
                     <div>
-                      Exposure: <strong className="text-slate-900 font-bold">{exp.toFixed(1)} ppm·h</strong>
+                      Dose: <strong className="text-slate-900">{exp.toFixed(1)} ppm·h</strong>
                     </div>
                     <div>
-                      Reader: <strong className="text-sky-700 font-mono">{assignedDev?.deviceId || 'DEV-0081'}</strong>
+                      Unit: <span className="font-mono text-sky-700">{assignedDev?.deviceId || 'DEV-0081'}</span>
                     </div>
-                    <div className="text-right text-[10px] text-slate-400">
+                    <div className="text-[10px] text-slate-400">
                       {worker.latestExposure?.timestamp ? formatIndianTime(worker.latestExposure.timestamp) : 'Recent'}
                     </div>
                   </div>
 
                   {status === 'HIGH' && (
-                    <div className="p-2 bg-rose-50 border border-rose-200 rounded-lg text-[10px] text-rose-900 font-bold flex items-center justify-between">
-                      <span>MANDATORY MEDICAL REMOVAL ACTIVE</span>
-                      <span className="text-rose-700 underline font-mono">EVACUATE SITE</span>
+                    <div className="p-1.5 bg-rose-100 rounded-lg text-[10px] text-rose-900 font-bold flex items-center justify-between">
+                      <span>MANDATORY REMOVAL ACTIVE</span>
+                      <span className="underline">Evacuate</span>
                     </div>
                   )}
                 </div>

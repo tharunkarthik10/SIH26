@@ -8,11 +8,9 @@ import { processCameraColorScan, performHybridCrossCheck } from '../services/cam
 import { assessHealthImpact } from '../services/healthImpactService';
 import { exportMeasurementsToCSV } from '../services/reportService';
 import { StatusPill } from '../components/common/StatusPill';
-import { ScientificDisclaimer } from '../components/common/ScientificDisclaimer';
 import { Measurement, ReadingMethod, Device } from '../types';
-import { formatIndianTime, formatIndianDate, formatIndianDateTime } from '../utils/dateUtils';
+import { formatIndianTime, formatIndianDate } from '../utils/dateUtils';
 import { CameraScannerModal, ScannedQRResult } from '../components/camera/CameraScannerModal';
-import { DemoQRCodesModal } from '../components/demo/DemoQRCodesModal';
 import { 
   ResponsiveContainer, 
   AreaChart, 
@@ -20,45 +18,29 @@ import {
   XAxis, 
   YAxis, 
   Tooltip, 
-  CartesianGrid, 
-  ReferenceLine,
-  ReferenceArea
+  CartesianGrid 
 } from 'recharts';
 import { 
   Radio, 
   Camera, 
   TrendingUp, 
   Download, 
-  Activity,
-  HeartPulse,
-  Clock,
+  Clock, 
   Calendar,
-  Layers,
-  ZoomIn,
-  ZoomOut,
-  RotateCcw,
-  Sparkles,
   CalendarDays,
+  AlertTriangle, 
+  CheckCircle2, 
+  ShieldAlert, 
   AlertCircle,
-  AlertTriangle,
-  CheckCircle2,
+  HeartPulse,
   Stethoscope,
-  Cpu,
-  ShieldAlert
+  Activity,
+  Timer
 } from 'lucide-react';
-
-const DAY_COLOR_PALETTE: Record<number, { bg: string; fill: string; stroke: string; text: string; badge: string; dotFill: string }> = {
-  0: { bg: 'bg-sky-50/80', fill: '#e0f2fe', stroke: '#7dd3fc', text: 'text-sky-800', badge: 'bg-sky-100 text-sky-800 border-sky-300', dotFill: '#0284c7' },
-  1: { bg: 'bg-emerald-50/80', fill: '#d1fae5', stroke: '#6ee7b7', text: 'text-emerald-800', badge: 'bg-emerald-100 text-emerald-800 border-emerald-300', dotFill: '#059669' },
-  2: { bg: 'bg-amber-50/80', fill: '#fef3c7', stroke: '#fcd34d', text: 'text-amber-800', badge: 'bg-amber-100 text-amber-800 border-amber-300', dotFill: '#d97706' },
-  3: { bg: 'bg-purple-50/80', fill: '#f3e8ff', stroke: '#c084fc', text: 'text-purple-800', badge: 'bg-purple-100 text-purple-800 border-purple-300', dotFill: '#7c3aed' },
-  4: { bg: 'bg-rose-50/80', fill: '#ffe4e6', stroke: '#fecdd3', text: 'text-rose-800', badge: 'bg-rose-100 text-rose-800 border-rose-300', dotFill: '#e11d48' },
-};
 
 export const ReadPage: React.FC = () => {
   const { user } = useAuth();
-  const { activeScenarioId } = useDemo();
-  const { isOffline, isDevMode, pendingSyncQueue, clearPendingSync, addToPendingSync } = useDemo();
+  const { activeScenarioId, isOffline, pendingSyncQueue, clearPendingSync, addToPendingSync } = useDemo();
   const { 
     workers, 
     devices, 
@@ -75,7 +57,7 @@ export const ReadPage: React.FC = () => {
     addIncident
   } = useData();
 
-  // Action flow modal state for Mandatory Shift Removal
+  // Action flow modal state for Incidents
   const [isIncidentModalOpen, setIsIncidentModalOpen] = useState(false);
   const [incidentNotes, setIncidentNotes] = useState('');
   const [isAcknowledged, setIsAcknowledged] = useState(false);
@@ -106,25 +88,14 @@ export const ReadPage: React.FC = () => {
   const [currentStepState, setCurrentStepState] = useState<WorkflowStepState | null>(null);
   const [scanResult, setScanResult] = useState<ScanExecutionResult | null>(null);
 
-  // Preset Mode: 'today' | 'from_start'
-  const [presetMode, setPresetMode] = useState<'today' | 'from_start'>('from_start');
+  // Time preset for chart: 'today' | 'all'
+  const [timePreset, setTimePreset] = useState<'today' | 'all'>('today');
 
-  // Zoomed Specific Date (when user clicks a day or zooms into a specific date)
-  const [zoomedDate, setZoomedDate] = useState<string | null>(null);
-
-  // Explicit Show Date in Chart Toggle
-  const [showDateOnXAxis, setShowDateOnXAxis] = useState<boolean>(true);
-
-  // Camera Scanner & Demo QR Modals State
+  // Camera Scanner Modal State
   const [isCameraScannerOpen, setIsCameraScannerOpen] = useState<boolean>(false);
-  const [isDemoQRCodesModalOpen, setIsDemoQRCodesModalOpen] = useState<boolean>(false);
   const [scanBannerMsg, setScanBannerMsg] = useState<{ text: string; type: 'device' | 'safe' | 'hazard' } | null>(null);
 
-  // Worker Live Vitals & Past Medical History State
-  const [userHeartRate, setUserHeartRate] = useState<number>(78);
-  const [userMedicalCondition, setUserMedicalCondition] = useState<string>('Asthma / Respiratory Hypersensitivity');
-
-  // Handle Real Camera QR Code Scan Result (Camera scanner or photo upload)
+  // Handle Camera QR Scan
   const handleRealCameraScanSuccess = (scanned: ScannedQRResult) => {
     const targetDevice: Device = (activeDevice || devices[0]) || {
       deviceId: scanned.deviceId || 'DEV-0081',
@@ -135,21 +106,18 @@ export const ReadPage: React.FC = () => {
     };
     const targetWorker = assignedWorker || workers[0] || { workerId: scanned.workerId || 'WRK-00124', name: scanned.workerName || 'Rajesh Kumar' };
 
-    // SCENARIO 1: DEVICE QR SCANNED
     if (scanned.targetType === 'device') {
       const timestamp = scanned.timestamp || new Date().toISOString();
       const devId = scanned.deviceId || targetDevice.deviceId;
       updateDeviceLastScan(devId, timestamp);
       setScanBannerMsg({
-        text: `Optical Reader Unit ${devId} Paired Successfully! Optical sensor calibrated & ready.`,
+        text: `Device ${devId} paired and calibrated`,
         type: 'device'
       });
       return;
     }
 
-    // SCENARIO 2: CHEMICAL STRIP QR SCANNED
     const scannedStripId = scanned.stripId || 'STRIP-2026-000124';
-
     let strip = chemicalStrips.find(s => s.stripId.toLowerCase() === scannedStripId.toLowerCase());
     if (!strip) {
       registerChemicalStrip({
@@ -163,9 +131,8 @@ export const ReadPage: React.FC = () => {
     }
 
     setActiveStripId(scannedStripId);
-
     const timestamp = scanned.timestamp || new Date().toISOString();
-    const isHazard = (scanned.exposurePpmH ?? 0) >= 25;
+    const isHazard = (scanned.exposurePpmH ?? 0) >= 20;
 
     const newMeasurement: Measurement = {
       measurementId: `MEAS-CAM-${Date.now().toString().slice(-4)}`,
@@ -201,15 +168,13 @@ export const ReadPage: React.FC = () => {
     updateDeviceLastScan(targetDevice.deviceId, newMeasurement.timestamp);
     updateStripStatus(scannedStripId, 'USED', newMeasurement.timestamp);
 
-    // Live visual reaction feedback and incident triggering
     if (isHazard) {
       setScanBannerMsg({
-        text: `Strip ${scannedStripId} Scanned: ${newMeasurement.estimatedExposure} ppm·h (HIGH) — MANDATORY MEDICAL SHIFT REMOVAL ACTIVE!`,
+        text: `High exposure detected: ${newMeasurement.estimatedExposure.toFixed(1)} ppm·h`,
         type: 'hazard'
       });
       setIsAcknowledged(false);
       setSupervisorNotified(false);
-      // Auto-dispatch open incident to Supervisor Dashboard
       addIncident({
         workerId: targetWorker.workerId,
         workerName: targetWorker.name,
@@ -217,15 +182,15 @@ export const ReadPage: React.FC = () => {
         timestamp,
         exposurePpmH: newMeasurement.estimatedExposure,
         alertType: 'CRITICAL TOXIC HAZARD',
-        actionTaken: 'MANDATORY MEDICAL LEAVE: Immediate 24-Hour Shift Removal',
+        actionTaken: 'MANDATORY MEDICAL LEAVE: Immediate Shift Removal',
         supervisorNotified: true,
         acknowledgedByWorker: false,
-        notes: `Simulated scan of high-exposure toxic coupon ${scannedStripId}. Real-time plant alert dispatched.`,
+        notes: `Simulated scan of high-exposure coupon ${scannedStripId}. Alert dispatched.`,
         status: 'OPEN'
       });
     } else {
       setScanBannerMsg({
-        text: `Strip ${scannedStripId} Scanned: ${newMeasurement.estimatedExposure} ppm·h (LOW) — Safe nominal baseline recorded.`,
+        text: `Scan recorded: ${newMeasurement.estimatedExposure.toFixed(1)} ppm·h (Safe baseline)`,
         type: 'safe'
       });
     }
@@ -251,11 +216,14 @@ export const ReadPage: React.FC = () => {
     ? scanResult.measurement 
     : (assignedWorker ? measurements.find(m => m && m.workerId === assignedWorker.workerId) : undefined) || measurements[0];
 
+  // Worker Live Vitals & Past Medical Baseline State
+  const [userMedicalCondition, setUserMedicalCondition] = useState<string>('Asthma / Respiratory Hypersensitivity');
+  const [userHeartRate, setUserHeartRate] = useState<number>(78);
+
   const currentExposure = typeof latestMeasurement?.estimatedExposure === 'number' ? latestMeasurement.estimatedExposure : 4.2;
   const healthAssessment = assessHealthImpact(currentExposure, userHeartRate, userMedicalCondition);
 
-  const isAsthmaCondition = userMedicalCondition.toLowerCase().includes('asthma') || userMedicalCondition.toLowerCase().includes('respiratory');
-
+  // Scan execution via NFC
   const handleExecuteScan = async (method: 'nfc' | 'camera') => {
     if (!activeDevice || !assignedWorker) return;
     setIsScanning(true);
@@ -268,7 +236,6 @@ export const ReadPage: React.FC = () => {
 
     if (activeStrip && ['LOW', 'MODERATE', 'HIGH'].includes(activeScenarioId)) {
       payload.stripId = activeStrip.stripId;
-
       const stripMeas = (measurements || []).filter(m => m && m.stripId === activeStrip.stripId);
       if (stripMeas.length > 0) {
         const lastTimestamp = new Date(stripMeas[stripMeas.length - 1].timestamp).getTime();
@@ -334,6 +301,11 @@ export const ReadPage: React.FC = () => {
         ...result,
         measurement: finalMeasurement,
       });
+
+      setScanBannerMsg({
+        text: `Reading: ${finalMeasurement.estimatedExposure.toFixed(1)} ppm·h recorded`,
+        type: finalMeasurement.exposureStatus === 'HIGH' ? 'hazard' : 'safe'
+      });
     } else {
       setScanResult(result);
     }
@@ -351,7 +323,7 @@ export const ReadPage: React.FC = () => {
       actionTaken: healthAssessment.mandatoryRestPeriod,
       supervisorNotified: true,
       acknowledgedByWorker: true,
-      notes: incidentNotes || 'Logged by field operator during mandatory shift removal warning.',
+      notes: incidentNotes || 'Logged by field operator during shift exposure alert.',
       status: 'OPEN'
     });
     setIsIncidentModalOpen(false);
@@ -359,169 +331,117 @@ export const ReadPage: React.FC = () => {
     setSupervisorNotified(true);
   };
 
-  // ONE GRAPH PER STRIP: Filter measurements strictly for active strip
+  // Filter measurements for chart & records
   const allStripMeasurements = (measurements || [])
     .filter(m => m && activeStrip && m.stripId === activeStrip.stripId)
     .sort((a, b) => new Date(a.timestamp || Date.now()).getTime() - new Date(b.timestamp || Date.now()).getTime());
 
-  // Extract all available unique dates
-  const availableDates = Array.from(new Set(
-    allStripMeasurements.map(m => m.timestamp ? formatIndianDate(m.timestamp) : '')
-  )).filter(Boolean);
+  const now = new Date();
+  const todayDateStr = formatIndianDate(now);
+  const todayFullDayName = now.toLocaleDateString('en-IN', { weekday: 'long' });
 
-  const todayDateStr = availableDates.length > 0 ? availableDates[availableDates.length - 1] : '';
+  const displayedMeasurements = timePreset === 'today'
+    ? allStripMeasurements.filter(m => m.timestamp && formatIndianDate(m.timestamp) === todayDateStr)
+    : allStripMeasurements;
 
-  // Determine active dataset based on Presets and Zoom State
-  let currentStripMeasurements = [...allStripMeasurements];
+  // Compute date range string for All Time mode
+  const firstDate = allStripMeasurements.length > 0 && allStripMeasurements[0].timestamp
+    ? formatIndianDate(allStripMeasurements[0].timestamp)
+    : todayDateStr;
+  const lastDate = allStripMeasurements.length > 0 && allStripMeasurements[allStripMeasurements.length - 1].timestamp
+    ? formatIndianDate(allStripMeasurements[allStripMeasurements.length - 1].timestamp)
+    : todayDateStr;
+  const allTimeRangeStr = firstDate === lastDate ? firstDate : `${firstDate} – ${lastDate}`;
 
-  if (zoomedDate) {
-    // Zoomed into specific day -> view hourly breakdown for that day
-    currentStripMeasurements = currentStripMeasurements.filter(m => {
-      if (!m.timestamp) return false;
-      const dStr = formatIndianDate(m.timestamp);
-      return dStr === zoomedDate;
-    });
-  } else if (presetMode === 'today' && todayDateStr) {
-    // Today preset -> view today's measurements only
-    currentStripMeasurements = currentStripMeasurements.filter(m => {
-      if (!m.timestamp) return false;
-      const dStr = formatIndianDate(m.timestamp);
-      return dStr === todayDateStr;
-    });
-  }
-
-  // Build Date Color Index Map for mild pastel day differentiation
-  const dateColorMap = new Map<string, number>();
-  availableDates.forEach((d, idx) => {
-    dateColorMap.set(d, idx % 5);
-  });
-
-  // Format Graph Data: Ensure unique X-axis time/date labels without duplicates
-  const timeSeenMap = new Map<string, number>();
-
-  let graphData = currentStripMeasurements.map(m => {
-    const dateObj = m.timestamp ? new Date(m.timestamp) : new Date();
-    const timeOnly = formatIndianTime(dateObj);
-    const timeWithSec = formatIndianTime(dateObj, true);
-    const dateShort = formatIndianDate(dateObj);
-    const fullDateStr = formatIndianDateTime(dateObj);
-
-    const colorIdx = dateColorMap.get(dateShort) ?? 0;
-    const dayColor = DAY_COLOR_PALETTE[colorIdx];
-
-    let label = '';
-    if (zoomedDate || presetMode === 'today') {
-      label = timeOnly;
-    } else if (showDateOnXAxis) {
-      label = `${dateShort} ${timeOnly}`;
-    } else {
-      const count = (timeSeenMap.get(timeOnly) || 0) + 1;
-      timeSeenMap.set(timeOnly, count);
-      label = count > 1 ? timeWithSec : timeOnly;
+  // Helper to format both day and time cleanly for reading items
+  const formatDayAndTime = (timestamp?: string) => {
+    if (!timestamp) return 'Just now';
+    const d = new Date(timestamp);
+    if (isNaN(d.getTime())) return 'Just now';
+    const itemDateStr = formatIndianDate(d);
+    const timeStr = formatIndianTime(d);
+    const dayName = d.toLocaleDateString('en-IN', { weekday: 'short' });
+    
+    if (todayDateStr === itemDateStr) {
+      return `Today, ${timeStr}`;
     }
+    return `${dayName}, ${itemDateStr} • ${timeStr}`;
+  };
+
+  // Chart data with Day and Time
+  const graphData = (displayedMeasurements.length > 0 ? displayedMeasurements : allStripMeasurements).map(m => {
+    const d = m.timestamp ? new Date(m.timestamp) : new Date();
+    const timeStr = formatIndianTime(d);
+    const dayStr = d.toLocaleDateString('en-IN', { weekday: 'short' });
+    const dateStr = formatIndianDate(d);
+    const fullDayStr = d.toLocaleDateString('en-IN', { weekday: 'long' });
+
+    // In All Time mode, prepend Day of week so points on different days are instantly distinguishable
+    const chartLabel = timePreset === 'all' ? `${dayStr} ${timeStr}` : timeStr;
 
     return {
-      time: label,
+      time: chartLabel,
+      shortTime: timeStr,
+      day: dayStr,
+      date: dateStr,
       exposure: typeof m.estimatedExposure === 'number' ? m.estimatedExposure : 0,
-      worker: m.workerName || m.workerId || 'Worker',
-      status: m.exposureStatus || 'LOW',
-      method: m.source === 'camera_scan' || m.readingMethod === 'camera_secondary' ? 'Camera Scan' : 'NFC Primary',
-      fullDate: fullDateStr,
-      dateOnly: dateShort,
-      dayColor,
+      fullDate: `${fullDayStr}, ${dateStr} • ${timeStr}`,
+      method: m.source === 'camera_scan' ? 'Camera' : 'NFC',
+      status: m.exposureStatus || 'LOW'
     };
   });
 
-  // Calculate Reference Area Bands for Mild Pastel Day Differentiation
-  const dayBands: { date: string; startLabel: string; endLabel: string; color: typeof DAY_COLOR_PALETTE[0] }[] = [];
-  if (!zoomedDate && graphData.length > 0) {
-    let currentBandDate = '';
-    let bandStartLabel = '';
-    let bandEndLabel = '';
-    let bandColor = DAY_COLOR_PALETTE[0];
-
-    graphData.forEach((item, idx) => {
-      if (item.dateOnly !== currentBandDate) {
-        if (currentBandDate) {
-          dayBands.push({
-            date: currentBandDate,
-            startLabel: bandStartLabel,
-            endLabel: bandEndLabel,
-            color: bandColor,
-          });
-        }
-        currentBandDate = item.dateOnly;
-        bandStartLabel = item.time;
-        bandEndLabel = item.time;
-        bandColor = item.dayColor;
-      } else {
-        bandEndLabel = item.time;
-      }
-
-      if (idx === graphData.length - 1 && currentBandDate) {
-        dayBands.push({
-          date: currentBandDate,
-          startLabel: bandStartLabel,
-          endLabel: bandEndLabel,
-          color: bandColor,
-        });
-      }
-    });
-  }
+  // Shift exposure percentage (20 ppm·h shift safe limit threshold)
+  const SHIFT_LIMIT = 20.0;
+  const exposurePct = Math.min(100, Math.round((currentExposure / SHIFT_LIMIT) * 100));
 
   if (!activeDevice || !assignedWorker) {
     return (
-      <div className="p-8 text-center font-sans text-slate-500">
-        Loading optical scanner...
+      <div className="p-8 text-center text-slate-500 font-sans text-sm">
+        Initializing optical dosimeter...
       </div>
     );
   }
 
   return (
-    <div className="space-y-4 font-sans animate-in fade-in">
-      {/* Page Header */}
-      <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
+    <div className="space-y-3.5 font-sans animate-in fade-in pb-2">
+      {/* Top Status Bar */}
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-bold text-slate-900 tracking-tight">Read Optical Telemetry</h1>
-          <p className="text-xs text-slate-500 font-sans">NFC Tap & Camera Photo Scanner</p>
+          <h1 className="text-base font-bold text-slate-900 tracking-tight">Dosimeter Reading</h1>
+          <p className="text-[11px] text-slate-500">
+            {assignedWorker.name} • Unit {activeDevice.deviceId}
+          </p>
         </div>
 
         <div className="flex items-center gap-1.5">
-          {/* OFFLINE PENDING SYNC STATUS BADGE */}
           {isOffline ? (
-            <span className="text-[10px] font-bold text-rose-700 bg-rose-100 border border-rose-200 px-2 py-0.5 rounded-full flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-              <span>Offline ({pendingSyncQueue.length} pending)</span>
+            <span className="text-[10px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
+              Offline ({pendingSyncQueue.length})
             </span>
           ) : (
-            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded-full">
-              Live Network
+            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+              Connected
             </span>
           )}
-          <span className="text-xs font-semibold text-sky-700 bg-sky-100 px-2.5 py-1 rounded-full">
-            Unit: {activeDevice.deviceId}
-          </span>
         </div>
       </div>
 
-      {/* REAL-TIME LIVE QR SCAN FEEDBACK BANNER */}
+      {/* Real-time Notification Banner */}
       {scanBannerMsg && (
-        <div className={`p-3 rounded-xl border flex items-center justify-between text-xs font-sans shadow-sm animate-in fade-in ${
+        <div className={`p-2.5 rounded-xl border flex items-center justify-between text-xs transition-all ${
           scanBannerMsg.type === 'hazard' 
-            ? 'bg-rose-100 border-2 border-rose-400 text-rose-950' 
-            : scanBannerMsg.type === 'device' 
-            ? 'bg-sky-50 border border-sky-300 text-sky-950' 
-            : 'bg-emerald-50 border border-emerald-300 text-emerald-950'
+            ? 'bg-rose-50 border-rose-200 text-rose-900' 
+            : 'bg-emerald-50 border-emerald-200 text-emerald-900'
         }`}>
           <div className="flex items-center gap-2">
             {scanBannerMsg.type === 'hazard' ? (
-              <ShieldAlert className="w-5 h-5 text-rose-600 shrink-0 animate-pulse" />
-            ) : scanBannerMsg.type === 'device' ? (
-              <Cpu className="w-5 h-5 text-sky-600 shrink-0" />
+              <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
             ) : (
-              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             )}
-            <span className="font-bold leading-tight">{scanBannerMsg.text}</span>
+            <span className="font-semibold text-[11px]">{scanBannerMsg.text}</span>
           </div>
           <button 
             onClick={() => setScanBannerMsg(null)} 
@@ -532,242 +452,391 @@ export const ReadPage: React.FC = () => {
         </div>
       )}
 
-      {/* OFFLINE PENDING SYNC QUEUE NOTIFICATION BANNER */}
+      {/* Offline sync reminder */}
       {isOffline && pendingSyncQueue.length > 0 && (
-        <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between text-xs font-sans">
-          <div className="flex items-center gap-2 text-amber-900">
-            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-            <span><strong>{pendingSyncQueue.length} readings</strong> stored locally offline. Will auto-sync on network reconnect.</span>
-          </div>
+        <div className="p-2 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between text-[11px] text-amber-900">
+          <span>{pendingSyncQueue.length} readings stored locally</span>
           <button
             onClick={() => clearPendingSync()}
-            className="px-2 py-1 bg-amber-600 text-white font-bold text-[10px] rounded hover:bg-amber-700"
+            className="px-2 py-0.5 bg-amber-600 text-white font-bold text-[10px] rounded hover:bg-amber-700"
           >
-            Force Sync
+            Sync Now
           </button>
         </div>
       )}
 
-      {/* SCANNING ACTION CTAs CARD */}
-      <div className="industrial-card p-4 space-y-4 border-2 border-sky-200 bg-white">
-        <div className="text-center space-y-1">
-          <div className="text-xs text-slate-500">Target Personnel: <strong className="text-slate-900">{assignedWorker.name}</strong></div>
-          <div className="text-[11px] text-slate-400">Assigned Email: {userEmail}</div>
-        </div>
-
-        {/* Animated Scanner Ring */}
-        <div className="flex flex-col items-center justify-center py-2">
-          <div className={`relative w-28 h-28 rounded-full flex items-center justify-center border-4 transition-all duration-500 ${
-            isScanning 
-              ? 'border-sky-500 shadow-lg shadow-sky-500/20 animate-pulse' 
-              : 'border-slate-200'
-          }`}>
-            <div className={`absolute inset-2 rounded-full border-2 border-dashed ${isScanning ? 'border-sky-400 animate-spin' : 'border-slate-200'}`} />
-            <div className="absolute inset-4 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center">
-              {activeScanMethod === 'camera' ? (
-                <Camera className={`w-10 h-10 ${isScanning ? 'text-amber-600 animate-bounce' : 'text-slate-400'}`} />
-              ) : (
-                <Radio className={`w-10 h-10 ${isScanning ? 'text-sky-600 animate-bounce' : 'text-slate-400'}`} />
-              )}
+      {/* HERO: Current Exposure Card */}
+      <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-xs space-y-3">
+        <div className="flex items-start justify-between">
+          <div>
+            <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
+              Shift Exposure
+            </span>
+            <div className="flex items-baseline gap-1.5 mt-0.5">
+              <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
+                {currentExposure.toFixed(1)}
+              </span>
+              <span className="text-xs font-bold text-slate-400">ppm·h</span>
             </div>
           </div>
-
-          {isScanning && (
-            <div className="mt-3 text-center space-y-0.5">
-              <div className="text-xs font-bold text-sky-700">{currentStepState?.label || "Processing Telemetry..."}</div>
-              <div className="text-[11px] text-slate-500">{currentStepState?.detail}</div>
-            </div>
-          )}
+          <StatusPill status={healthAssessment.status} />
         </div>
 
-        {/* DEDICATED CTAs */}
-        <div className="space-y-2 pt-1">
-          {/* CTA 1: NFC TAP MEASUREMENT */}
-          <button
-            onClick={() => handleExecuteScan('nfc')}
-            disabled={isScanning}
-            className="w-full industrial-button-primary py-3 px-4 text-xs font-bold flex items-center justify-center gap-2 shadow-sm"
-          >
-            <Radio className={`w-4 h-4 ${isScanning && activeScanMethod === 'nfc' ? 'animate-bounce' : 'animate-pulse'}`} />
-            <span>{isScanning && activeScanMethod === 'nfc' ? 'Tapping NFC Device...' : 'NFC Tap Measurement'}</span>
-          </button>
+        {/* Progress against 20 ppm·h limit */}
+        <div className="space-y-1">
+          <div className="flex justify-between text-[10px] text-slate-500">
+            <span>Shift limit: 20 ppm·h</span>
+            <span className="font-semibold text-slate-700">{exposurePct}% of safe limit</span>
+          </div>
+          <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+            <div 
+              className={`h-full transition-all duration-500 rounded-full ${
+                exposurePct >= 80 ? 'bg-rose-500' : exposurePct >= 50 ? 'bg-amber-500' : 'bg-emerald-500'
+              }`}
+              style={{ width: `${exposurePct}%` }}
+            />
+          </div>
+        </div>
 
-          {/* CTA 2: PHOTOGRAPH CAMERA SCAN */}
-          <button
-            onClick={() => setIsCameraScannerOpen(true)}
-            disabled={isScanning}
-            className="w-full py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-extrabold flex items-center justify-center gap-2 transition-all shadow-sm"
-          >
-            <Camera className="w-4 h-4 text-white" />
-            <span>Photograph Camera Scan (Scan Strip or Device QR)</span>
-          </button>
+        <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-100">
+          <span className="flex items-center gap-1">
+            <Clock className="w-3 h-3 text-slate-400" />
+            Last read: {latestMeasurement ? formatIndianTime(latestMeasurement.timestamp) : 'Just now'}
+          </span>
+          <span>Strip: {activeStrip?.stripId || 'STRIP-2026-000124'}</span>
         </div>
       </div>
 
-      {/* LATEST RESULT & REGULATORY REFERENCE ANCHORS CARD */}
-      {latestMeasurement && (
-        <div className="industrial-card p-4 bg-white space-y-3 border-2 border-sky-100 animate-in fade-in">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+      {/* HEALTH IMPACT & ESTIMATED REST TIME ANALYZER */}
+      <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-xs space-y-3">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+          <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900">
+            <HeartPulse className="w-4 h-4 text-rose-500" />
+            <span>Health Impact & Rest Analyzer</span>
+          </div>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+            healthAssessment.alertLevel === 'critical' ? 'bg-rose-100 text-rose-800' :
+            healthAssessment.alertLevel === 'moderate' ? 'bg-amber-100 text-amber-800' :
+            'bg-emerald-100 text-emerald-800'
+          }`}>
+            {healthAssessment.overallRiskCategory}
+          </span>
+        </div>
+
+        {/* ESTIMATED REST TIME CALLOUT */}
+        <div className={`p-3 rounded-xl border flex items-center justify-between ${
+          healthAssessment.isMedicalLeaveRequired 
+            ? 'bg-rose-50 border-rose-200 text-rose-950' 
+            : healthAssessment.alertLevel === 'moderate' 
+            ? 'bg-amber-50 border-amber-200 text-amber-950' 
+            : 'bg-emerald-50 border-emerald-200 text-emerald-950'
+        }`}>
+          <div className="flex items-center gap-2.5">
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold shrink-0 ${
+              healthAssessment.isMedicalLeaveRequired ? 'bg-rose-200 text-rose-800' :
+              healthAssessment.alertLevel === 'moderate' ? 'bg-amber-200 text-amber-800' :
+              'bg-emerald-200 text-emerald-800'
+            }`}>
+              <Timer className="w-4 h-4" />
+            </div>
             <div>
-              <div className="text-[11px] text-slate-500 font-bold flex items-center gap-1">
-                <span>Cumulative Dosage Result</span>
-                <span className="text-[10px] text-sky-700 font-normal underline">(Shift-Cumulative 8h Dose)</span>
+              <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                Estimated Rest Required
               </div>
-              <div className="text-2xl font-extrabold text-slate-900 flex items-baseline gap-1">
-                <span>{(currentExposure ?? 0).toFixed(1)}</span>
-                <span className="text-xs font-bold text-slate-500">ppm·h</span>
-              </div>
-            </div>
-
-            <div className="space-y-1 text-right">
-              <StatusPill status={healthAssessment.status} />
-              <div className="text-[9px] text-slate-400 font-mono">Shift TWA: ~{(currentExposure / 8).toFixed(2)} ppm</div>
-            </div>
-          </div>
-
-          {/* REGULATORY EXPOSURE LIMIT REFERENCE ANCHORS */}
-          <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5 text-[10px] font-sans">
-            <div className="font-bold text-slate-700 uppercase tracking-wider text-[9px] flex items-center justify-between">
-              <span>Regulatory Gas Exposure Limit Reference Anchors</span>
-              <span className="text-sky-700 font-mono">OSHA / NIOSH Standards</span>
-            </div>
-
-            <div className="grid grid-cols-3 gap-1 text-center font-semibold">
-              <div className={`p-1.5 rounded-lg border ${currentExposure >= 10 ? 'bg-amber-100 border-amber-300 text-amber-900' : 'bg-white border-slate-200 text-slate-700'}`}>
-                <div className="font-bold">OSHA PEL</div>
-                <div className="text-[9px]">10 ppm (8h TWA)</div>
-              </div>
-
-              <div className={`p-1.5 rounded-lg border ${currentExposure >= 15 ? 'bg-amber-200 border-amber-400 text-amber-950 font-bold' : 'bg-white border-slate-200 text-slate-700'}`}>
-                <div className="font-bold">OSHA STEL</div>
-                <div className="text-[9px]">15 ppm (15-min)</div>
-              </div>
-
-              <div className={`p-1.5 rounded-lg border ${currentExposure >= 25 ? 'bg-rose-100 border-rose-300 text-rose-900 font-bold' : 'bg-white border-slate-200 text-slate-700'}`}>
-                <div className="font-bold">NIOSH IDLH</div>
-                <div className="text-[9px]">100 ppm Ceiling</div>
+              <div className="font-extrabold text-xs">
+                {healthAssessment.mandatoryRestPeriod}
               </div>
             </div>
           </div>
+        </div>
 
-          {/* WORKER TELEMETRY VITALS & ASTHMA RISK MULTIPLIER EXPLANATION */}
-          <div className="p-2.5 bg-sky-50/70 rounded-xl border border-sky-200 space-y-2 text-xs font-sans">
-            <div className="text-[10px] text-sky-900 font-bold uppercase tracking-wider flex items-center justify-between">
-              <span>Worker Risk Profile & Asthma Safety Factor</span>
-              <span className="text-sky-700 font-mono">ID: {assignedWorker?.workerId || 'WRK-00124'}</span>
-            </div>
+        {/* PERSONAL MEDICAL DATA FACTORS */}
+        <div className="space-y-2 text-xs">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-slate-500 text-[11px] flex items-center gap-1">
+              <Stethoscope className="w-3.5 h-3.5 text-sky-600" />
+              Medical Baseline:
+            </span>
+            <select
+              value={userMedicalCondition}
+              onChange={(e) => setUserMedicalCondition(e.target.value)}
+              className="bg-slate-50 border border-slate-200 text-[11px] font-bold text-slate-800 rounded-lg px-2 py-1 focus:outline-none focus:border-sky-500 max-w-[180px]"
+            >
+              <option value="Asthma / Respiratory Hypersensitivity">Asthma / Respiratory</option>
+              <option value="Pre-existing Cardiac Condition">Cardiac Condition</option>
+              <option value="Chronic Bronchitis">Chronic Bronchitis</option>
+              <option value="Healthy Baseline (No Conditions)">Healthy Baseline</option>
+            </select>
+          </div>
 
-            {/* Past Medical Condition Selector */}
-            <div className="flex items-center justify-between gap-1 text-[11px]">
-              <span className="text-slate-600 font-medium flex items-center gap-1">
-                <Stethoscope className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                Medical Baseline:
-              </span>
-              <select
-                value={userMedicalCondition}
-                onChange={(e) => setUserMedicalCondition(e.target.value)}
-                className="bg-white border border-slate-200 text-[10px] font-bold text-slate-800 rounded px-1.5 py-0.5 focus:outline-none focus:border-sky-500 max-w-[170px]"
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-slate-500 text-[11px] flex items-center gap-1">
+              <Activity className="w-3.5 h-3.5 text-rose-500" />
+              Heart Rate / Exertion:
+            </span>
+            <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-[10px] font-bold">
+              <button
+                type="button"
+                onClick={() => setUserHeartRate(78)}
+                className={`px-2 py-0.5 rounded-md transition-all ${
+                  userHeartRate <= 85 ? 'bg-white text-slate-900 shadow-2xs font-extrabold' : 'text-slate-500'
+                }`}
               >
-                <option value="Asthma / Respiratory Hypersensitivity">Asthma / Respiratory</option>
-                <option value="Pre-existing Cardiac Condition">Cardiac Condition</option>
-                <option value="Chronic Bronchitis">Chronic Bronchitis</option>
-                <option value="Healthy Baseline (No Conditions)">Healthy Baseline</option>
-              </select>
-            </div>
-
-            {/* ASTHMA ADJUSTMENT CALCULATION EXPLANATION BANNER */}
-            <div className="p-2 bg-white rounded-lg border border-sky-200 text-[10px] text-slate-700 space-y-0.5">
-              <div className="font-bold text-sky-900 flex items-center gap-1">
-                <AlertCircle className="w-3 h-3 text-sky-600" />
-                <span>Risk Model Safety Factor: {isAsthmaCondition ? '0.8x Applied' : '1.0x Baseline'}</span>
-              </div>
-              <p className="text-slate-500 leading-tight">
-                {isAsthmaCondition 
-                  ? 'Worker profile has logged Asthma. Personal shift exposure limit is reduced by 20% (16.0 ppm·h vs Standard 20.0 ppm·h) to prevent bronchial hyper-reactivity.' 
-                  : 'Nominal physiological tolerance model applied for healthy baseline operator.'}
-              </p>
+                78 BPM (Resting)
+              </button>
+              <button
+                type="button"
+                onClick={() => setUserHeartRate(105)}
+                className={`px-2 py-0.5 rounded-md transition-all ${
+                  userHeartRate > 85 ? 'bg-white text-rose-700 shadow-2xs font-extrabold' : 'text-slate-500'
+                }`}
+              >
+                105 BPM (Exertion)
+              </button>
             </div>
           </div>
 
-          {/* EXPLICIT ACTION FLOW FOR MANDATORY MEDICAL SHIFT REMOVAL */}
-          {healthAssessment.isMedicalLeaveRequired || healthAssessment.alertLevel === 'critical' || healthAssessment.alertLevel === 'moderate' ? (
-            <div className="p-3 bg-rose-50 border-2 border-rose-300 rounded-xl space-y-2.5 text-xs font-sans">
-              <div className="flex items-center justify-between text-rose-950 font-extrabold">
-                <span className="flex items-center gap-1.5 text-xs">
-                  <AlertTriangle className="w-4 h-4 text-rose-600 animate-pulse" />
-                  <span>{healthAssessment.riskTitle}</span>
-                </span>
-                <span className="text-[10px] bg-rose-200 text-rose-900 px-2 py-0.5 rounded font-mono">ACTION REQUIRED</span>
-              </div>
-
-              <p className="text-[11px] text-rose-900 leading-tight">
-                {healthAssessment.recommendedAction}
-              </p>
-
-              {/* THREE EXPLICIT ACTION BUTTONS */}
-              <div className="grid grid-cols-3 gap-1.5 pt-1">
-                {/* 1. ACKNOWLEDGE BUTTON */}
-                <button
-                  onClick={() => setIsAcknowledged(true)}
-                  className={`py-2 px-2 rounded-lg font-bold text-[10px] border flex items-center justify-center gap-1 transition-all ${
-                    isAcknowledged ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-rose-900 border-rose-300 hover:bg-rose-100'
-                  }`}
-                >
-                  <CheckCircle2 className="w-3 h-3" />
-                  <span>{isAcknowledged ? 'Acknowledged' : 'Acknowledge'}</span>
-                </button>
-
-                {/* 2. NOTIFY SUPERVISOR BUTTON */}
-                <button
-                  onClick={() => setSupervisorNotified(true)}
-                  className={`py-2 px-2 rounded-lg font-bold text-[10px] border flex items-center justify-center gap-1 transition-all ${
-                    supervisorNotified ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-rose-900 border-rose-300 hover:bg-rose-100'
-                  }`}
-                >
-                  <Activity className="w-3 h-3 text-sky-600" />
-                  <span>{supervisorNotified ? 'Supervisor Sent' : 'Notify Supervisor'}</span>
-                </button>
-
-                {/* 3. LOG INCIDENT BUTTON */}
-                <button
-                  onClick={() => setIsIncidentModalOpen(true)}
-                  className="py-2 px-2 rounded-lg bg-rose-700 hover:bg-rose-800 text-white font-bold text-[10px] flex items-center justify-center gap-1 transition-all shadow-2xs"
-                >
-                  <AlertCircle className="w-3 h-3" />
-                  <span>Log Incident</span>
-                </button>
-              </div>
+          {/* PHYSIOLOGICAL DAMAGE & RECOVERY NOTE */}
+          <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 space-y-1 text-[11px]">
+            <div className="font-bold text-slate-800 flex items-center justify-between">
+              <span>Personalized Damage Assessment:</span>
+              <span className="text-[10px] font-mono text-slate-500">{healthAssessment.medicalConditionFactor.split(':')[0]}</span>
             </div>
-          ) : null}
+            <p className="text-slate-600 leading-relaxed text-[11px]">
+              {healthAssessment.physiologicalDamage}
+            </p>
+            <div className="text-[10px] text-sky-700 font-medium pt-0.5">
+              💡 {healthAssessment.heartRateFactor}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Critical Hazard Alert Action (Only when elevated) */}
+      {(healthAssessment.isMedicalLeaveRequired || currentExposure >= 15) && (
+        <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl space-y-2 text-xs">
+          <div className="flex items-center justify-between text-rose-950 font-bold">
+            <span className="flex items-center gap-1.5">
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{healthAssessment.riskTitle}</span>
+            </span>
+            <span className="text-[10px] bg-rose-200 text-rose-900 px-1.5 py-0.5 rounded font-medium">Alert</span>
+          </div>
+          <p className="text-[11px] text-rose-800 leading-snug">
+            {healthAssessment.recommendedAction}
+          </p>
+          <div className="flex gap-2 pt-0.5">
+            <button
+              onClick={() => setIsAcknowledged(true)}
+              className={`flex-1 py-1.5 rounded-xl font-bold text-[11px] transition-all ${
+                isAcknowledged ? 'bg-emerald-600 text-white' : 'bg-white border border-rose-300 text-rose-900 hover:bg-rose-100'
+              }`}
+            >
+              {isAcknowledged ? 'Acknowledged' : 'Acknowledge'}
+            </button>
+            <button
+              onClick={() => setIsIncidentModalOpen(true)}
+              className="flex-1 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px]"
+            >
+              {supervisorNotified ? 'Incident Logged' : 'Log Incident'}
+            </button>
+          </div>
         </div>
       )}
 
-      {/* INCIDENT LOGGING MODAL */}
+      {/* SCAN CONTROLS: Clean 2-Action Grid */}
+      <div className="bg-white rounded-2xl p-3 border border-slate-200/90 shadow-xs space-y-2.5">
+        <div className="grid grid-cols-2 gap-2">
+          {/* Primary Action: NFC Tap */}
+          <button
+            onClick={() => handleExecuteScan('nfc')}
+            disabled={isScanning}
+            className="py-3 px-3 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-[0.98] text-white font-bold text-xs flex flex-col items-center justify-center gap-1.5 transition-all shadow-xs disabled:opacity-60"
+          >
+            <Radio className={`w-5 h-5 ${isScanning && activeScanMethod === 'nfc' ? 'animate-spin' : ''}`} />
+            <span>{isScanning && activeScanMethod === 'nfc' ? 'Reading NFC...' : 'NFC Tap'}</span>
+          </button>
+
+          {/* Secondary Action: Camera QR Scan */}
+          <button
+            onClick={() => setIsCameraScannerOpen(true)}
+            disabled={isScanning}
+            className="py-3 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-[0.98] border border-slate-200 text-slate-800 font-bold text-xs flex flex-col items-center justify-center gap-1.5 transition-all disabled:opacity-60"
+          >
+            <Camera className="w-5 h-5 text-slate-600" />
+            <span>Camera Scan</span>
+          </button>
+        </div>
+
+        {/* Scan in progress step status */}
+        {isScanning && (
+          <div className="p-2 bg-sky-50 rounded-xl text-center space-y-0.5 animate-in fade-in">
+            <div className="text-xs font-bold text-sky-800">
+              {currentStepState?.label || "Communicating with sensor..."}
+            </div>
+            <div className="text-[10px] text-slate-500">
+              {currentStepState?.detail || "Hold dosimeter close to NFC antenna"}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Exposure Trend Chart */}
+      <div className="bg-white rounded-2xl p-3.5 border border-slate-200/90 shadow-xs space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900">
+              <TrendingUp className="w-4 h-4 text-sky-600" />
+              <span>Exposure Trend</span>
+            </div>
+            <div className="flex items-center gap-1 text-[10px] text-slate-500 font-medium">
+              <CalendarDays className="w-3 h-3 text-sky-600 shrink-0" />
+              <span>
+                {timePreset === 'today'
+                  ? `${todayFullDayName}, ${todayDateStr} • Today's Shift`
+                  : `${allTimeRangeStr} • Multi-Day History`}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex bg-slate-100 p-0.5 rounded-xl text-[10px] font-bold">
+            <button
+              onClick={() => setTimePreset('today')}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg transition-all ${
+                timePreset === 'today' ? 'bg-white text-sky-700 shadow-2xs font-extrabold' : 'text-slate-500 hover:text-slate-700'
+              }`}
+              title="Today's shift readings"
+            >
+              <Clock className="w-3 h-3 text-sky-600" />
+              <span>Today</span>
+            </button>
+            <button
+              onClick={() => setTimePreset('all')}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg transition-all ${
+                timePreset === 'all' ? 'bg-white text-sky-700 shadow-2xs font-extrabold' : 'text-slate-500 hover:text-slate-700'
+              }`}
+              title="All-time historical readings"
+            >
+              <Calendar className="w-3 h-3 text-slate-500" />
+              <span>All Time</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Minimal Area Chart */}
+        <div className="h-40 w-full pt-1">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={graphData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+              <defs>
+                <linearGradient id="cleanSkyGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#0284c7" stopOpacity={0.25}/>
+                  <stop offset="95%" stopColor="#0284c7" stopOpacity={0.0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+              <XAxis dataKey="time" stroke="#cbd5e1" tick={{ fontSize: 9, fill: '#64748b' }} />
+              <YAxis stroke="#cbd5e1" tick={{ fontSize: 9, fill: '#64748b' }} domain={[0, 'dataMax + 5']} />
+              <Tooltip
+                content={({ active, payload }: any) => {
+                  if (active && payload && payload.length) {
+                    const d = payload[0].payload;
+                    return (
+                      <div className="bg-slate-900 text-white px-2.5 py-1.5 rounded-xl text-[10px] shadow-lg space-y-0.5">
+                        <div className="font-extrabold text-xs text-sky-300">{d.exposure} ppm·h</div>
+                        <div className="text-slate-300 text-[9px] flex items-center gap-1">
+                          <Clock className="w-2.5 h-2.5 text-sky-400" />
+                          <span>{d.fullDate}</span>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+              />
+              <Area 
+                type="monotone" 
+                dataKey="exposure" 
+                stroke="#0284c7" 
+                strokeWidth={2}
+                dot={{ r: 3, fill: '#0284c7' }}
+                fillOpacity={1} 
+                fill="url(#cleanSkyGradient)" 
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Recent Readings List */}
+      <div className="bg-white rounded-2xl p-3.5 border border-slate-200/90 shadow-xs space-y-2">
+        <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+          <span className="font-bold text-xs text-slate-900">Recent Readings</span>
+          <button
+            onClick={() => exportMeasurementsToCSV(allStripMeasurements, workers)}
+            className="text-[10px] font-semibold text-sky-600 hover:text-sky-700 flex items-center gap-1"
+          >
+            <Download className="w-3 h-3" />
+            <span>Export CSV</span>
+          </button>
+        </div>
+
+        <div className="space-y-1.5">
+          {displayedMeasurements.length === 0 ? (
+            <div className="text-center py-4 text-xs text-slate-400">
+              No readings recorded yet
+            </div>
+          ) : (
+            displayedMeasurements.slice(-3).reverse().map((m) => (
+              <div 
+                key={m.measurementId} 
+                className="flex items-center justify-between p-2 rounded-xl bg-slate-50 hover:bg-slate-100/70 transition-all text-xs"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center font-bold">
+                    {m.source === 'camera_scan' ? <Camera className="w-3.5 h-3.5" /> : <Radio className="w-3.5 h-3.5" />}
+                  </div>
+                  <div>
+                    <div className="font-bold text-slate-900">
+                      {(m.estimatedExposure ?? 0).toFixed(1)} <span className="text-[10px] font-normal text-slate-500">ppm·h</span>
+                    </div>
+                    <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                      <Clock className="w-2.5 h-2.5 text-slate-400" />
+                      <span>{formatDayAndTime(m.timestamp)}</span>
+                    </div>
+                  </div>
+                </div>
+                <StatusPill status={m.exposureStatus} />
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Incident Log Modal */}
       {isIncidentModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-4 max-w-sm w-full space-y-3 font-sans shadow-2xl animate-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-              <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-1.5">
+              <h3 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
                 <AlertCircle className="w-4 h-4 text-rose-600" />
-                <span>Log Safety Incident Record</span>
+                <span>Log Safety Incident</span>
               </h3>
               <button onClick={() => setIsIncidentModalOpen(false)} className="text-slate-400 hover:text-slate-700 text-xs">✕</button>
             </div>
 
             <div className="space-y-2 text-xs">
-              <div className="p-2 bg-slate-50 rounded-lg">
+              <div className="p-2 bg-slate-50 rounded-xl space-y-0.5 text-slate-700">
                 <div>Worker: <strong>{assignedWorker?.name}</strong></div>
-                <div>Exposure: <strong>{currentExposure.toFixed(1)} ppm·h</strong></div>
-                <div>Action: <strong>{healthAssessment.mandatoryRestPeriod}</strong></div>
+                <div>Recorded: <strong>{currentExposure.toFixed(1)} ppm·h</strong></div>
               </div>
 
               <div>
-                <label className="font-semibold text-slate-700">Incident Details & Symptoms:</label>
+                <label className="font-semibold text-slate-700">Notes / Symptoms:</label>
                 <textarea
                   value={incidentNotes}
                   onChange={(e) => setIncidentNotes(e.target.value)}
-                  placeholder="Describe location, symptoms (eye irritation, headache, nausea), or leak source..."
-                  className="w-full mt-1 p-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-sky-500 h-20"
+                  placeholder="Location or symptoms noted..."
+                  className="w-full mt-1 p-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-sky-500 h-18"
                 />
               </div>
             </div>
@@ -781,245 +850,14 @@ export const ReadPage: React.FC = () => {
               </button>
               <button
                 onClick={handleLogIncidentSubmit}
-                className="flex-1 py-2 rounded-xl bg-rose-600 text-white font-bold text-xs hover:bg-rose-700 shadow-sm"
+                className="flex-1 py-2 rounded-xl bg-rose-600 text-white font-bold text-xs hover:bg-rose-700"
               >
-                Submit Incident Log
+                Submit Incident
               </button>
             </div>
           </div>
         </div>
       )}
-
-      {/* ONE GRAPH PER STRIP (WITH TODAY, FROM START PRESETS & MILD PASTEL DAY COLORS) */}
-      <div className="industrial-card p-4 space-y-3 bg-white border border-slate-200">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-          <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900 uppercase tracking-wider">
-            <TrendingUp className="w-4 h-4 text-sky-600" />
-            <span>PPM Calculator Chart</span>
-          </div>
-
-          {/* Only 2 Needed Presets: Today (Today's shift) vs From Start (Full strip lifetime) */}
-          <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg text-xs font-sans">
-            <button
-              onClick={() => { setPresetMode('today'); setZoomedDate(null); }}
-              className={`px-3 py-1 rounded-md text-[11px] font-bold transition-all ${
-                presetMode === 'today' && !zoomedDate ? 'bg-white text-sky-700 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              Today
-            </button>
-            <button
-              onClick={() => { setPresetMode('from_start'); setZoomedDate(null); }}
-              className={`px-3 py-1 rounded-md text-[11px] font-bold transition-all ${
-                presetMode === 'from_start' && !zoomedDate ? 'bg-white text-sky-700 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              From Start
-            </button>
-          </div>
-        </div>
-
-        {/* ACTIVE ZOOM OR DATE SELECTION NOTIFICATION BANNER */}
-        {zoomedDate ? (
-          <div className="p-2 bg-sky-50 border border-sky-200 rounded-xl flex items-center justify-between text-xs font-sans animate-in fade-in">
-            <div className="flex items-center gap-1.5 text-sky-900 font-bold">
-              <ZoomIn className="w-4 h-4 text-sky-600 shrink-0" />
-              <span>Zoomed into: <strong className="text-sky-900 underline">{zoomedDate}</strong> (Hourly View)</span>
-            </div>
-            <button
-              onClick={() => setZoomedDate(null)}
-              className="px-2 py-1 rounded-md bg-white border border-sky-300 text-sky-800 text-[10px] font-bold hover:bg-sky-100 flex items-center gap-1 shadow-2xs"
-            >
-              <RotateCcw className="w-3 h-3" />
-              <span>Reset Zoom</span>
-            </button>
-          </div>
-        ) : (
-          /* MILD PASTEL DAY COLOR LEGEND BAR (TAP ANY DAY TO ZOOM INTO HOURLY BREAKDOWN) */
-          <div className="space-y-1.5 pt-0.5">
-            <div className="text-[10px] text-slate-400 font-semibold flex items-center justify-between">
-              <span>Day Colors (Tap day to zoom into hourly view):</span>
-              <button
-                onClick={() => setShowDateOnXAxis(prev => !prev)}
-                className="text-sky-700 font-bold hover:underline"
-              >
-                {showDateOnXAxis ? 'Hide X-Date' : 'Show X-Date'}
-              </button>
-            </div>
-
-            <div className="flex flex-wrap gap-1.5 text-[10px] font-sans">
-              {availableDates.map((d, idx) => {
-                const color = DAY_COLOR_PALETTE[idx % 5];
-                return (
-                  <button
-                    key={d}
-                    onClick={() => setZoomedDate(d)}
-                    className={`px-2 py-0.5 rounded-full border font-bold flex items-center gap-1 transition-all hover:scale-105 shadow-2xs ${color.badge}`}
-                    title={`Zoom into ${d} hourly breakdown`}
-                  >
-                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color.dotFill }} />
-                    <span>{d}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Recharts Area Plot with Mild Pastel Day Bands and Explicit Data Point Dots */}
-        <div className="h-56 w-full pt-1">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={graphData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-              <defs>
-                <linearGradient id="mobileGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#0284c7" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#0284c7" stopOpacity={0.0}/>
-                </linearGradient>
-              </defs>
-              
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="time" stroke="#94a3b8" tick={{ fontSize: 9, fill: '#64748b' }} interval="preserveStartEnd" />
-              <YAxis stroke="#94a3b8" tick={{ fontSize: 10, fill: '#64748b' }} domain={[0, 'dataMax + 10']} />
-              
-              <Tooltip 
-                content={({ active, payload }: any) => {
-                  if (active && payload && payload.length) {
-                    const data = payload[0].payload;
-                    return (
-                      <div className="bg-white border border-slate-200 p-2.5 rounded-xl shadow-md text-[11px] space-y-1 font-sans">
-                        <div className="text-slate-400 font-semibold">{data.fullDate || data.time}</div>
-                        <div className="text-slate-900 font-extrabold text-xs">{data.exposure} ppm·h</div>
-                        <div className="flex items-center gap-1.5 pt-0.5">
-                          <span className="text-sky-700 text-[10px] font-bold bg-sky-50 px-1.5 py-0.5 rounded">{data.method}</span>
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                            data.status === 'HIGH' ? 'bg-rose-100 text-rose-800' : data.status === 'MODERATE' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
-                          }`}>{data.status}</span>
-                        </div>
-                        <div className="text-[10px] text-sky-600 pt-1 border-t border-slate-100 italic">
-                          💡 Tap point to zoom into {data.dateOnly} hourly view
-                        </div>
-                      </div>
-                    );
-                  }
-                  return null;
-                }}
-              />
-
-              {/* Render Mild Pastel Reference Area Background Bands per Day */}
-              {dayBands.map((band) => (
-                <ReferenceArea
-                  key={band.date}
-                  x1={band.startLabel}
-                  x2={band.endLabel}
-                  fill={band.color.fill}
-                  fillOpacity={0.45}
-                  stroke={band.color.stroke}
-                  strokeDasharray="2 2"
-                />
-              ))}
-              
-              <ReferenceLine y={10} stroke="#d97706" strokeDasharray="3 3" />
-              <ReferenceLine y={25} stroke="#e11d48" strokeDasharray="3 3" />
-
-              <Area 
-                type="monotone" 
-                dataKey="exposure" 
-                stroke="#0284c7" 
-                strokeWidth={2.5}
-                dot={{ r: 5, fill: '#0284c7', stroke: '#ffffff', strokeWidth: 2 }}
-                activeDot={{ r: 7, fill: '#0369a1', stroke: '#ffffff', strokeWidth: 2 }}
-                fillOpacity={1} 
-                fill="url(#mobileGradient)" 
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
-          <span>Active Strip: <strong className="text-slate-800 font-mono">{activeStrip ? activeStrip.stripId : 'STRIP-2026-000124'}</strong></span>
-          <span className="text-sky-700 font-semibold flex items-center gap-1">
-            <Clock className="w-3 h-3 text-sky-600" />
-            {zoomedDate ? `Zoomed: ${zoomedDate}` : presetMode === 'today' ? 'Today (Hourly View)' : 'From Start (Strip Lifetime)'}
-          </span>
-        </div>
-      </div>
-
-      {/* PROPER STORED AUDIT RECORDS TABLE / LIST */}
-      <div className="industrial-card p-4 space-y-3 bg-white border border-slate-200">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-          <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900 uppercase tracking-wider">
-            <Activity className="w-4 h-4 text-sky-600" />
-            <span>Stored Audit Records ({currentStripMeasurements.length})</span>
-          </div>
-
-          <button
-            onClick={() => exportMeasurementsToCSV(currentStripMeasurements, workers)}
-            className="p-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 transition-colors flex items-center gap-1 text-xs font-semibold"
-            title="Export CSV Log"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">CSV</span>
-          </button>
-        </div>
-
-        {/* Clean Structured Stored Audit List with max height scroll container */}
-        <div className="space-y-2.5 text-xs font-sans max-h-80 overflow-y-auto pr-1">
-          {currentStripMeasurements.length === 0 ? (
-            <div className="p-4 text-center text-slate-400 text-xs italic">
-              No audit records stored yet for this strip.
-            </div>
-          ) : (
-            currentStripMeasurements.slice().reverse().map((m) => {
-              const impact = assessHealthImpact(m.estimatedExposure);
-              const isCamera = m.source === 'camera_scan' || m.readingMethod === 'camera_secondary';
-
-              return (
-                <div key={m.measurementId} className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2 hover:bg-slate-100/80 transition-colors shadow-2xs">
-                  {/* Top Row: Exposure, Scan Source, and Status Pill */}
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="font-extrabold text-slate-900 text-base">
-                        {(m.estimatedExposure ?? 0).toFixed(1)}
-                      </span>
-                      <span className="text-xs text-slate-500 font-bold">{m.exposureUnit || 'ppm·h'}</span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 ${
-                        isCamera ? 'bg-amber-100 text-amber-800' : 'bg-sky-100 text-sky-800'
-                      }`}>
-                        {isCamera ? <Camera className="w-3 h-3 text-amber-600" /> : <Radio className="w-3 h-3 text-sky-600" />}
-                        {isCamera ? 'Camera Scan' : 'NFC Primary'}
-                      </span>
-                      <StatusPill status={m.exposureStatus} />
-                    </div>
-                  </div>
-
-                  {/* Middle Row: Date, Absorbance, Strip ID */}
-                  <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-500 border-t border-b border-slate-200/60 py-1.5">
-                    <div className="flex items-center gap-1 text-slate-600 font-medium">
-                      <Clock className="w-3 h-3 text-sky-600 shrink-0" />
-                      <span>{formatIndianDateTime(m.timestamp)}</span>
-                    </div>
-
-                    <div className="text-right">
-                      Absorbance: <strong className="text-slate-800 font-mono">{(m.opticalReading ?? 0).toFixed(3)} AU</strong>
-                    </div>
-                  </div>
-
-                  {/* Bottom Row: Health Damage Assessment */}
-                  <div className="text-[11px] text-slate-700 font-semibold truncate flex items-center justify-between">
-                    <span>{impact.riskTitle}</span>
-                    <span className="text-slate-400 text-[10px] font-mono">{m.stripId}</span>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
-
-      <ScientificDisclaimer compact />
 
       {/* Camera Live Scanner Modal */}
       <CameraScannerModal
